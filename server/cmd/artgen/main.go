@@ -25,7 +25,7 @@ const pollEvery = 6 * time.Second
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: artgen plan|run|prep [flags]")
+		fmt.Println("usage: artgen plan|run|prep|jitter|prompts|status [flags]")
 		os.Exit(2)
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
@@ -59,6 +59,15 @@ func main() {
 		run(mg, jobs, assets, runOpts{conc: *conc, gap: *gap, redo: *redo, limit: *limit})
 	case "prep":
 		prepAll(jobs, assets)
+	case "jitter":
+		// Chấm điểm độ giật cho mọi animation (GAME_SPEC §12.5 B.5). Tách thành lệnh riêng
+		// chứ không gộp vào `prep`: `prep` phải chạy nhanh sau mỗi lần thả ảnh mới, còn
+		// chấm điểm thì đọc lại toàn bộ ~900 frame.
+		rep, err := buildJitter(assets)
+		if err != nil {
+			log.Fatal(err)
+		}
+		printJitter(rep, 0)
 	case "prompts":
 		writePrompts(jobs, assets, filepath.Join(filepath.Dir(assets), "docs", "ART_JOBS.md"))
 	case "status":

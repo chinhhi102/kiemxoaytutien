@@ -65,6 +65,8 @@ export const STR = {
   disconnected: 'Mất kết nối với máy chủ. Đang thử lại...',
   badName: 'Tên phải dài 2–16 ký tự.',
   controlsPc: 'Di chuyển: WASD / phím mũi tên / giữ chuột. Thiêu Đốt Tinh Huyết: giữ Shift, hoặc nháy đúp chuột rồi giữ. Kỹ năng: Space. Không có nút đánh — kiếm tự xoay!',
+  animInfoOn: 'Hiện số liệu hoạt ảnh (J): tên anim · frame · pha · điểm độ giật',
+  animInfoOff: 'Tắt số liệu hoạt ảnh',
   qualitySet: (name: string) => `Chất lượng đồ họa: ${name} (phím V để đổi)`,
   controlsMobile: 'Kéo ngón tay để di chuyển. Thiêu Đốt Tinh Huyết: chạm 2 lần rồi giữ, hoặc giữ nút 🔥. Kiếm tự xoay!',
 

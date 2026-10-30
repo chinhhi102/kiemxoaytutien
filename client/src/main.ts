@@ -14,6 +14,7 @@ import { ClientWorld } from './net/state';
 import { assets } from './render/assets';
 import { loadFonts } from './render/fonts';
 import { GameScene } from './render/scene';
+import { loadJitter } from './render/jitter';
 import { cycleQuality, quality, QUALITY_NAME } from './render/quality';
 import { ringGeom } from './render/ringgeom';
 import type { Telemetry, TelemetryContext } from './telemetry';
@@ -71,6 +72,8 @@ class App {
   private telemetry: Telemetry | null = null;
   /** zoneIndex: khu đang đứng, lấy từ Welcome (spec §8.0). Telemetry chia nhóm theo nó. */
   private zoneIndex = 0;
+  /** animInfo: phím J đang bật hay tắt (GAME_SPEC §12.5 C). */
+  private animInfo = false;
 
   constructor(private readonly cfg: GameConfig, private readonly overlay: HTMLElement, stage: HTMLElement) {
     this.screens = new Screens(overlay);
@@ -96,6 +99,13 @@ class App {
       }
       if (this.playing && e.code === 'KeyM' && !e.repeat) {
         this.hud.minimap.toggle(); // spec §12.1
+        return;
+      }
+      if (this.playing && e.code === 'KeyJ' && !e.repeat && this.debug) {
+        // GAME_SPEC §12.5 C: hiện tên anim, frame, pha và điểm độ giật trên từng nhân vật.
+        this.animInfo = !this.animInfo;
+        void loadJitter().then(() => this.scene.showAnimInfo(this.animInfo));
+        this.hud.showBanner(this.animInfo ? STR.animInfoOn : STR.animInfoOff, 1.5);
         return;
       }
       if (this.playing && e.code === 'F3' && !e.repeat) {

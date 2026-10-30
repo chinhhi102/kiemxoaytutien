@@ -4,6 +4,7 @@ import type { GameConfig } from '../config';
 import type { PlayerFrame } from '../net/state';
 import { BUFFS, FLAG, statusOn } from '../net/protocol';
 import { assets, type AnimSet } from './assets';
+import { animJitter, JITTER_RED } from './jitter';
 import { animShort, initials } from './catalog';
 import { BUFF_COLORS, charColor } from './palette';
 import { moodName } from '../net/protocol';
@@ -57,6 +58,8 @@ export class PlayerSprite {
   private statusKey = '';
   /** bornAt: lúc view bắt đầu được vẽ, để mờ dần vào. */
   private bornAt = 0;
+  /** animInfo: dòng chữ của phím debug `J` (GAME_SPEC §12.5 C, dòng cuối). */
+  private readonly animInfo = new Text({ text: '', style: { fontSize: 32, fontWeight: '700', fill: 0x8ef58e, stroke: { color: 0x000000, width: 6 } } });
 
   constructor(
     private readonly cfg: GameConfig,
@@ -70,7 +73,17 @@ export class PlayerSprite {
     this.plate = new Nameplate(cfg, name, isMe, Input.isTouchDevice());
     // Hào quang Tiên giới KHÔNG còn nằm ở đây: nó chuyển sang `vfxLayer` dùng chung để ăn
     // một lượt bloom cho cả màn hình thay vì mỗi nhân vật một filter (spec §3.6).
-    this.root.addChild(this.shadow, this.aura, this.bodyBox, this.statusIcons, this.plate.root);
+    // `animInfo` gắn vào ROOT chứ không vào thân placeholder: thân placeholder chỉ tồn tại
+    // khi THIẾU art, mà phím J lại chủ yếu dùng để soi art ĐÃ CÓ. Gắn nhầm chỗ là bấm J
+    // không thấy gì — đúng lỗi tôi vừa mắc.
+    this.animInfo.anchor.set(0.5, 0);
+    this.animInfo.scale.set(0.013);
+    // Đặt TRÊN bảng tên chứ không dưới chân: vòng kiếm vẽ ở lớp riêng nằm trên nhân vật,
+    // nên mọi chỗ quanh chân đều bị nó che — chụp thử ở Luyện Hư thì chữ mất hẳn sau vòng
+    // kiếm tím. Phía trên đầu là chỗ duy nhất luôn trống.
+    this.animInfo.y = -2.6;
+    this.animInfo.visible = false;
+    this.root.addChild(this.shadow, this.aura, this.bodyBox, this.statusIcons, this.plate.root, this.animInfo);
     if (!this.atlas) {
       this.body = this.placeholderBody();
       this.bodyBox.addChild(this.body);
@@ -88,6 +101,46 @@ export class PlayerSprite {
    *
    * Trả về `false` nếu không đổi được (chưa có atlas) để nơi gọi biết mà thử lại sau.
    */
+  /**
+   * showAnimInfo bật/tắt dòng chữ debug của phím `J` (GAME_SPEC §12.5 C).
+   *
+   * Hiện NGAY TRÊN từng nhân vật chứ không gom vào một bảng góc màn hình: cái cần nhìn là
+   * "con này đang giật" — phải thấy chữ cạnh đúng con đang giật thì mới đối chiếu được với
+   * mắt mình.
+   */
+  showAnimInfo(on: boolean): void {
+    this.animInfo.visible = on;
+    if (!on) {
+      this.animInfo.text = '';
+    }
+  }
+
+  /**
+   * updateAnimInfo cập nhật dòng debug; chỉ chạy khi phím `J` đang bật.
+   *
+   * Vị trí tính theo `headY` và `zoom` — ĐÚNG hai thứ bảng tên dùng — chứ không đặt một
+   * hằng số: toạ độ trong `root` là ĐƠN VỊ THẾ GIỚI, mà nhân vật rộng vài chục đơn vị và
+   * camera lùi xa dần theo cảnh giới. Đặt "y = -2.6" như tôi làm lúc đầu thì ở Luyện Hư nó
+   * dịch đúng 0.7 pixel, tức là chữ nằm đè lên giữa nhân vật và không ai đọc được.
+   */
+  private updateAnimInfo(headY: number, zoom: number): void {
+    if (!this.animInfo.visible) {
+      return;
+    }
+    // Chia cho zoom để chữ giữ nguyên cỡ trên màn hình dù camera xa hay gần — giống bong
+    // bóng thoại. Đặt phía TRÊN bảng tên (bảng tên cao khoảng 26 px màn hình).
+    this.animInfo.scale.set(0.34 / zoom);
+    this.animInfo.y = headY - 46 / zoom;
+    const sp = this.body as AnimatedSprite | null;
+    const frames = sp?.textures?.length ?? 0;
+    const cur = sp?.currentFrame ?? -1;
+    const phase = frames > 0 ? (cur / frames) : 0;
+    const jit = animJitter(this.char, this.mood);
+    this.animInfo.text = `${this.mood || '?'} ${cur + 1}/${frames} pha ${phase.toFixed(2)}`
+      + (jit === null ? '' : ` giật ${jit.toFixed(0)}`);
+    this.animInfo.style.fill = jit !== null && jit >= JITTER_RED ? 0xff6b6b : 0x8ef58e;
+  }
+
   /** hasAtlas: đã có ảnh thật chưa, hay đang vẽ placeholder (ngân sách §4.3 là 0 khung). */
   hasAtlas(): boolean {
     return this.atlas !== null;
@@ -154,6 +207,7 @@ export class PlayerSprite {
     const headY = -r * (CHAR_HEIGHT_PER_R - FEET_BELOW_CENTER) - 4 / zoom;
     this.plate.update(s.L, s.ti ?? 0, myRealm, headY, zoom, now, r * 2.6 * zoom >= PLATE_FAR_PX, plateFade);
     this.swordRing.update(f, now, showHitbox, swordDetail);
+    this.updateAnimInfo(headY, zoom);
     this.updateStatusIcons(s.st ?? 0, r, now);
     this.updateBubble(r, zoom, now);
   }

@@ -286,6 +286,11 @@ export class GameScene {
         this.players.set(f.view.id, sp);
         this.entities.addChild(sp.root);
         this.rings.addChild(sp.ring);
+        // Nhân vật vừa xuất hiện cũng phải bật sẵn lớp debug nếu phím J đang bật — không thì
+        // đúng những con mới vào khung (chỗ hay giật nhất) lại là chỗ không có số.
+        if (this.animInfoOn) {
+          sp.showAnimInfo(true);
+        }
       }
       sp.update(f, this.zoom, now, this.showHitbox, detail, myRealm, this.plateFade(f, frames));
       this.syncAura(f, now);
@@ -503,6 +508,17 @@ export class GameScene {
    * (TELEMETRY_SPEC §2.2). Để ở đây chứ không để `players` lộ ra ngoài: vòng lặp nằm cạnh
    * dữ liệu, và không ai ngoài scene chạm được vào bảng sprite.
    */
+  /** showAnimInfo bật/tắt lớp chữ debug của phím `J` trên MỌI nhân vật đang vẽ. */
+  showAnimInfo(on: boolean): void {
+    this.animInfoOn = on;
+    for (const p of this.players.values()) {
+      p.showAnimInfo(on);
+    }
+  }
+
+  /** animInfoOn: giữ trạng thái để nhân vật MỚI xuất hiện cũng bật sẵn, không phải bấm lại. */
+  private animInfoOn = false;
+
   drawStats(): { charsInView: number; swordsDrawn: number; placeholder: boolean } {
     let swordsDrawn = 0;
     let placeholder = false;
