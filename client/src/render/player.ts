@@ -18,6 +18,8 @@ const ART_FILL = 0.72; // characters fill 72% of their 512 canvas (ART_PROMPTS �
 // Largest text box inside the oval of ui/speech_bubble.png, as fractions of the canvas.
 const BUBBLE_INNER = { x0: 0.21, y0: 0.15, x1: 0.65, y1: 0.59 };
 const BUBBLE_MAX_TEXT_W = 220;
+/** Mờ dần vào khi nhân vật lọt vào khung hình (NETCODE_SPEC §5 mục 4). */
+const FADE_IN_SECS = 0.12;
 
 // Animations missing from an atlas fall back along this chain.
 const FALLBACK: Record<string, string[]> = {
@@ -45,7 +47,7 @@ export class PlayerSprite {
   private body: AnimatedSprite | Container | null = null;
   /** Bảng tên trên đầu: danh hiệu · cảnh giới · tên, gộp thành một cụm (spec §12.3). */
   private readonly plate: Nameplate;
-  private readonly atlas: AnimSet | null;
+  private atlas: AnimSet | null;
   private mood = '';
   private bubble: Container | null = null;
   private readonly animLabel = new Text({ text: '', style: { fontSize: 40, fontWeight: '800', fill: 0xffffff, stroke: { color: 0x000000, width: 6 } } });
@@ -53,12 +55,14 @@ export class PlayerSprite {
   /** Vòng icon trạng thái quanh nhân vật (🚫 khi không nhặt được đồ — spec v5.5 §6.3). */
   private readonly statusIcons = new Container();
   private statusKey = '';
+  /** bornAt: lúc view bắt đầu được vẽ, để mờ dần vào. */
+  private bornAt = 0;
 
   constructor(
     private readonly cfg: GameConfig,
     readonly id: number,
     name: string,
-    readonly char: string,
+    public char: string,
     private readonly isMe: boolean,
   ) {
     this.atlas = assets.atlas(`characters/${char}`);
@@ -71,6 +75,35 @@ export class PlayerSprite {
       this.body = this.placeholderBody();
       this.bodyBox.addChild(this.body);
     }
+  }
+
+  /**
+   * setCharacter đổi nhân vật **tại chỗ**, không dựng lại view (NETCODE_SPEC §5 mục 5).
+   *
+   * Vì sao cần: gói snapshot chỉ gửi tên nhân vật (`ch`) LẦN ĐẦU client thấy một người. Nếu
+   * client từng mất view (xem `state.ts expire`) thì view dựng lại có `char` rỗng → vẽ
+   * placeholder, và tới nhịp gửi lại tên mới có `char` thật. Bản cũ gặp `char` đổi thì
+   * **huỷ cả sprite rồi dựng lại** — thêm một lần nhấp nháy nữa, đúng lúc người chơi đang
+   * nhìn nhân vật hiện ra.
+   *
+   * Trả về `false` nếu không đổi được (chưa có atlas) để nơi gọi biết mà thử lại sau.
+   */
+  setCharacter(char: string): boolean {
+    if (char === this.char) {
+      return true;
+    }
+    const next = assets.atlas(`characters/${char}`);
+    if (!next) {
+      return false;
+    }
+    this.char = char;
+    this.atlas = next;
+    this.mood = ''; // ép `updateBody` dựng lại thân theo atlas mới
+    if (this.body) {
+      this.body.destroy({ children: true });
+      this.body = null;
+    }
+    return true;
   }
 
   // Placeholder (no art yet): coloured circle + character initials + current animation name.
@@ -274,8 +307,14 @@ export class PlayerSprite {
     if (flags & FLAG.transit) {
       a *= 0.5;
     }
+    // Mờ dần VÀO trong 120 ms khi nhân vật lọt vào khung hình (NETCODE_SPEC §5 mục 4):
+    // bật sáng đột ngột đọc ra y như nhấp nháy, kể cả khi view không hề bị dựng lại.
+    if (this.bornAt === 0) {
+      this.bornAt = now;
+    }
+    a *= Math.min(1, (now - this.bornAt) / FADE_IN_SECS);
     this.root.alpha = a;
-    this.ring.alpha = flags & FLAG.stealth ? 0.45 : 1;
+    this.ring.alpha = (flags & FLAG.stealth ? 0.45 : 1) * Math.min(1, (now - this.bornAt) / FADE_IN_SECS);
     this.swordRing.visible = !(flags & FLAG.dead);
   }
 

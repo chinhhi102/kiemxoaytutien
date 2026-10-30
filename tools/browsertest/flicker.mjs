@@ -1,12 +1,20 @@
-// Đo HAI triệu chứng spec v6 §0 nói tới, bằng số chứ không bằng mắt:
-//   1. entity trong khung nhìn bị huỷ rồi dựng lại (nhấp nháy)
-//   2. khung hình có nhân vật vẽ bằng placeholder
+// Đo HAI triệu chứng NETCODE_SPEC §0/§1 nói tới, bằng số chứ không bằng mắt:
+//   1. entity trong khung nhìn bị huỷ rồi dựng lại (nhấp nháy) — ngân sách §1: **0**
+//   2. nhân vật vẽ bằng placeholder — ngân sách §1: **0**
 //
-// Cách đo: bọc `Map.prototype.delete` của bảng người chơi thì không chắc; thay vào đó đếm
-// thẳng trên `window.kx` — số người client đang giữ, và số lần một id biến mất rồi quay lại.
+//   node flicker.mjs [url]
+//
+// Kịch bản đúng như bài kiểm tra §7: **bot đi qua lại ĐÚNG MÉP khung nhìn 30 giây**.
+// Đây là chỗ duy nhất lỗi xuất hiện, và cũng là chỗ tôi suýt bỏ sót: lượt đo đầu tiên tôi
+// đứng một mình giữa khu, ra "0 nhấp nháy" và gần như kết luận là không có lỗi.
+//
+// Cách ép bot ra mép: thả bot cạnh mình (phím B), rồi **tự mình chạy ra xa** cho tới khi
+// chúng nằm quanh ranh giới AOI — server bỏ qua entity xa hơn NỬA khung nhìn trên các tick
+// lẻ (tối ưu 10 Hz), nên mép đó chính là nơi "vắng mặt một gói" xảy ra liên tục.
 import { chromium } from 'playwright';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const URL = process.argv[2] ?? 'http://127.0.0.1:9998';
+const WATCH_MS = 30000;
 
 const b = await chromium.launch({ headless: true, args: ['--use-gl=angle','--use-angle=gl','--enable-gpu','--ignore-gpu-blocklist'] });
 const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
@@ -16,45 +24,61 @@ await p.fill('input', 'FlickTest');
 await p.getByText('Vào chơi', { exact: true }).click();
 await p.waitForFunction(() => window.kx?.playing?.() === true, null, { timeout: 60000 });
 await sleep(2000);
-// Thả bot ngay cạnh mình: không có entity nào trong tầm nhìn thì phép đo vô nghĩa (lượt
-// đầu chạy ra "1 người, 0 lần nhấp nháy" chỉ vì tôi đứng một mình giữa khu).
-for (let i = 0; i < 8; i++) {
-  await p.keyboard.press('b');
-  await sleep(200);
-}
-await sleep(2000);
 
-// Theo dõi 15 giây: mỗi 50 ms ghi lại tập id đang có, đếm số lần một id rời đi rồi quay lại.
-const res = await p.evaluate(async () => {
-  const seenGone = new Map();   // id -> thời điểm biến mất
-  let respawn2s = 0, gone = 0, maxPlayers = 0;
+// Lên cảnh giới cao: khung nhìn rộng ra, nên "nửa khung nhìn" (ranh giới 10 Hz) nằm xa
+// hẳn và bot thả ra dễ rơi đúng vào vùng mép.
+for (let i = 0; i < 6; i++) { await p.keyboard.press('r'); await sleep(200); }
+for (let i = 0; i < 10; i++) { await p.keyboard.press('b'); await sleep(200); }
+await sleep(1500);
+
+// Đi qua lại để bot liên tục cắt qua ranh giới AOI.
+const walk = async () => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < WATCH_MS) {
+    for (const key of ['KeyD', 'KeyA']) {
+      await p.keyboard.down(key);
+      await sleep(2500);
+      await p.keyboard.up(key);
+      if (Date.now() - t0 >= WATCH_MS) { break; }
+    }
+  }
+};
+
+const watch = p.evaluate(async (ms) => {
+  const goneAt = new Map();
+  let gone = 0, respawn2s = 0, maxSeen = 0;
+  let placeholderFrames = 0, frames = 0;
   const t0 = performance.now();
   let prev = new Set();
-  while (performance.now() - t0 < 15000) {
+  while (performance.now() - t0 < ms) {
     const now = performance.now();
     const cur = new Set(window.kx.world.players.keys());
-    maxPlayers = Math.max(maxPlayers, cur.size);
+    maxSeen = Math.max(maxSeen, cur.size);
     for (const id of prev) {
-      if (!cur.has(id)) { seenGone.set(id, now); gone++; }
+      if (!cur.has(id)) { goneAt.set(id, now); gone++; }
     }
     for (const id of cur) {
-      const at = seenGone.get(id);
+      const at = goneAt.get(id);
       if (at !== undefined) {
         if (now - at < 2000) { respawn2s++; }
-        seenGone.delete(id);
+        goneAt.delete(id);
       }
     }
     prev = cur;
+    // Khung có placeholder: PlayerSprite không có atlas thì thân là Container, không phải
+    // AnimatedSprite. Đếm theo KHUNG, đúng chỉ số §6 của spec.
+    frames++;
+    for (const sp of window.kx.scene.players.values()) {
+      if (!sp.atlas) { placeholderFrames++; break; }
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
-  // Nhân vật đang vẽ bằng placeholder: PlayerSprite không có atlas thì body là Container,
-  // có atlas thì là AnimatedSprite.
-  let placeholder = 0, total = 0; const info = [];
-  for (const sp of window.kx.scene.players.values()) {
-    total++;
-    if (!sp.atlas) { placeholder++; info.push({ id: sp.id, char: JSON.stringify(sp.char), viewChar: JSON.stringify(window.kx.world.players.get(sp.id)?.char) }); }
-  }
-  return { gone, respawn2s, maxPlayers, placeholder, total, info, giay: 15 };
-});
-console.log(JSON.stringify(res, null, 1));
-await b.close(); process.exit(0);
+  return { gone, respawn2s, maxSeen, placeholderFrames, frames };
+}, WATCH_MS);
+
+await walk();
+const res = await watch;
+console.log(JSON.stringify({ ...res, giay: WATCH_MS / 1000 }, null, 1));
+await b.close();
+// Thoát khác 0 khi vượt ngân sách, để chạy được trong CI mà không phải đọc bằng mắt.
+process.exit(res.respawn2s === 0 && res.placeholderFrames === 0 ? 0 : 1);

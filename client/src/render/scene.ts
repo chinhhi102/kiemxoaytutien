@@ -276,8 +276,12 @@ export class GameScene {
     for (const f of frames) {
       seen.add(f.view.id);
       let sp = this.players.get(f.view.id);
-      if (!sp || sp.char !== f.view.char) {
-        sp?.destroy();
+      // Đổi nhân vật thì đổi TẠI CHỖ; chỉ dựng view mới khi thật sự chưa có (xem
+      // `PlayerSprite.setCharacter`). Bản cũ huỷ rồi dựng lại, thêm một lần nhấp nháy.
+      if (sp && sp.char !== f.view.char && f.view.char) {
+        sp.setCharacter(f.view.char);
+      }
+      if (!sp) {
         sp = new PlayerSprite(this.cfg, f.view.id, f.view.name, f.view.char, f.view.id === this.world?.myId);
         this.players.set(f.view.id, sp);
         this.entities.addChild(sp.root);
