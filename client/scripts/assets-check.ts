@@ -102,12 +102,10 @@ for (const [kind, n] of kinds) {
 console.log(`Đã kiểm ${checked} tệp bắt buộc trong ${catalog().length} mục, và ${kinds.size} loại vật cản bản đồ dùng.`);
 if (warn.length > 0) {
   console.log(`\nThiếu ${warn.length} mục art KHÔNG chặn build (game bỏ qua, không vẽ placeholder):`);
-  const byGroup = new Map<string, number>();
+  // In ĐÍCH DANH tệp, không chỉ đếm theo nhóm. Đếm thì biết "thiếu 7 mục" nhưng muốn sinh
+  // bù lại phải đi dò tay — mà dò tay là chỗ `bamboo_wall` nằm im suốt nhiều tuần.
   for (const w of warn) {
-    byGroup.set(w.group, (byGroup.get(w.group) ?? 0) + 1);
-  }
-  for (const [g, n] of [...byGroup].sort((a, b) => b[1] - a[1])) {
-    console.log(`  ${g}: ${n} mục`);
+    console.log(`  [${w.group}] ${w.label}: ${w.files.join(', ')}`);
   }
 }
 if (blocking.length > 0) {

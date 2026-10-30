@@ -332,11 +332,16 @@ func mapJobs() []Job {
 	return jobs
 }
 
+// decorID đổi mô tả thành tên file: "a broken TV" → "broken_tv".
+//
+// Phải hạ CHỮ THƯỜNG. Bản cũ giữ nguyên hoa nên sinh ra `broken_TV.png`, trong khi client
+// tra `broken_tv.png` — trên Linux đó là hai tệp khác nhau, và món đồ trang trí ấy không
+// bao giờ hiện trong game. Không có lỗi nào được ném ra; nó chỉ lặng lẽ không có mặt.
 func decorID(d string) string {
 	for _, p := range []string{"a ", "an "} {
 		d = strings.TrimPrefix(d, p)
 	}
-	return strings.ReplaceAll(d, " ", "_")
+	return strings.ToLower(strings.ReplaceAll(d, " ", "_"))
 }
 
 // Obstacle canvases are square: the client keeps the art's aspect and repeats it along long
@@ -638,6 +643,9 @@ var decals = []struct{ id, desc string }{
 	{"bamboo_leaves", "bamboo leaves pile"},
 	{"moss_patch", "moss patch"},
 	{"footprints", "footprints in dirt"},
+	// `cart_tracks` client có khai báo nhưng artgen chưa bao giờ sinh — cùng loại lỗ hổng
+	// với `bamboo_wall`: thiếu một thứ không ai liệt kê thì không có gì để mà thiếu.
+	{"cart_tracks", "two parallel cart wheel ruts in dirt"},
 }
 
 var zoneEdges = []struct{ id, desc string }{
@@ -698,7 +706,7 @@ func mapArtJobs() []Job {
 
 func allJobs() []Job {
 	var jobs []Job
-	for _, f := range []func() []Job{skillArtJobs, swordJobs, itemJobs, characterJobs, bodyFaceJobs, monsterJobs, mapJobs, obstacleJobs, gateJobs, vfxJobs, beastJobs, mapArtJobs, uiJobs} {
+	for _, f := range []func() []Job{skillArtJobs, swordJobs, itemJobs, characterJobs, bodyFaceJobs, monsterJobs, ambientJobs, mapJobs, obstacleJobs, gateJobs, vfxJobs, beastJobs, mapArtJobs, uiJobs} {
 		jobs = append(jobs, f()...)
 	}
 	return jobs
