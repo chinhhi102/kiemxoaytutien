@@ -62,8 +62,19 @@ Mỗi lượt 1 dòng **cho mỗi kịch bản đã chạy**. Ô đạt ngân s�
 | 4 | 2026-10-30 | `f5720c0` | Mốc chuẩn (client, mạng thường) | S2 | 0.7 / 1.6 ✅ | 19.5 / 45.5 ❌ | 2.5 ✅ | 7.6 / 3.6 ⚠ | 2.5 ✅ | 0 ⚠ | chưa đo | chưa đo | — | Băng thông đỉnh 45.5 KB/s ở tab Đạo Tổ |
 | 4 | 2026-10-30 | `f5720c0` | Mốc chuẩn (client, 4G yếu) | S3 | 0.3 / 0.5 ✅ | 7.7 / 13.6 ✅ | 0.6 ✅ | – | – | – | chưa đo | chưa đo | — | **Cột Đạo Tổ rỗng** — xem ghi chú dưới |
 | 4 | 2026-10-30 | `f5720c0` | Mốc chuẩn (nhịp chơi) | S5 | – | – | – | – | – | – | – | – | Lượt chết 2.10 → **4.70** / bot / 5 phút | Do luật v5.8 (bị chém về sàn cảnh giới) |
+| 6 | 2026-10-30 | `ab0f706` | **Sửa texture 1 GB** — `filterArea` bám khung nhìn + atlas 128 + boulder 512 | S4\*\* | – | – | – | 58 / – | 0.5 | 112 | 0 | – | Texture GPU **1 076 → 102 MB**; art tĩnh 607 → 378 MB | Vẫn còn placeholder/respawn (xem dòng 7) |
+| 7 | 2026-10-30 | `d34def5` | Mở telemetry trên `:9999` — **lượt chạy kiểm chứng, KHÔNG phải người thật** | S6\*\*\* | 0.35 / 1.54 ✅ | 7.9 / 8.2 ✅ | 0.5 ✅ | 59 / 28 ⚠ | – | 54 ✅ | 12 ❌ | 13.50 ❌ | — | Placeholder và respawn vẫn vượt ngân sách → hướng A bước 2b |
 
 \* Dòng có dấu `*`: đo trước khi chuẩn hóa kịch bản, chỉ để tham khảo, **không dùng làm mốc so sánh**. Lượt tối ưu kế tiếp phải chạy lại đủ S1–S4 để tạo **mốc chuẩn mới (#4)**.
+
+\*\* Dòng #6 đo bằng **một tab headless** (`--use-gl=angle --use-angle=gl`), không phải S4 đúng
+nghĩa (S4 cần tab có giao diện, người ngồi đọc F3 60 giây). Con số FPS ở đây chỉ để chứng minh
+hình **không hỏng** sau khi sửa; số FPS thật của máy người chơi phải lấy từ S4 hoặc S6.
+
+\*\*\* Dòng #7 là **lượt chạy kiểm chứng đường ống telemetry**, không phải số liệu người thật:
+N = 1 phiên và phiên đó là tab headless của chính tôi. Ghi lại để đối chiếu khi dòng S6 **thật
+sự tự động** đầu tiên xuất hiện. Hai ô ❌ (12 khung placeholder, 13.50 respawn/phút) **là số
+thật** và là phần dư của NETCODE bước 2a — chúng chính là việc của bước 2b.
 
 ## 4. Máy đo chuẩn
 
@@ -155,7 +166,20 @@ Kết quả (`flicker.mjs`, **bot đi qua lại đúng mép khung nhìn 30 giây
 
 44 → 3 là đúng: ba lần còn lại là entity rời đi **thật** và được xoá sau 2 giây chờ.
 
-Nút thắt đã đóng: **B3**.
+> ⚠ **Sửa lại ngày 30/10 — hai ô "0 ✅" ở trên chỉ đúng với SERVER TEST, không đúng với
+> `:9999` thật.** Bảng trên đo trên một server test dựng riêng, ít người, bot do chính bài
+> test thả ra. Chạy lại đúng `flicker.mjs` đó trên `:9999` (nhiều người, 5 khu, bot chuyển
+> khu liên tục) ra **respawn 3 / 0 / 1 / 1 / 0 và placeholder 252 / 0 / 24 / 4 / 0 qua 5 lượt**
+> — tức là **chưa đạt ngân sách**, và biến thiên lớn giữa các lượt.
+>
+> Telemetry trên `:9999` xác nhận lại bằng số liệu độc lập: **12 khung placeholder, 13.5
+> respawn/phút** (dòng #7).
+>
+> Bài học, ghi ra để không lặp lại: tôi kết luận "đạt ngân sách" sau MỘT lượt đo trên một
+> môi trường yên tĩnh hơn môi trường thật. Một lượt đo xanh trên server test không chứng minh
+> được gì về server có người chơi.
+
+Nút thắt **B3 mở lại** (xem §6): phần dễ đã xong, phần còn lại thuộc bước 2b.
 
 Bị chặn / chưa làm được:
 - **View Pool** (§5 L2) và **mờ dần RA 150 ms** chưa làm — thuộc bước 2b, cần chỗ giữ view
@@ -170,6 +194,55 @@ Tác dụng phụ / rủi ro:
 Việc tiếp theo: bước 2b (View Pool, mờ ra, cấm placeholder build thật, `check:assets`).
 
 ---
+
+### Lượt #6 — Texture 1 GB làm hỏng hình trên laptop (2026-10-30, commit `ab0f706`)
+
+Khởi nguồn **không phải từ một kịch bản đo**, mà từ ảnh chụp của đội test: trên laptop + wifi,
+mặt đất và nhân vật mất hẳn texture, chỉ còn nét viền trắng.
+
+Đo trên máy thật (`renderer.texture.managedTextures`), không đoán:
+
+| Chỉ số | Trước | Sau |
+|---|---|---|
+| Tổng texture GPU lúc đang chơi | **1 076 MB** | **102 MB** |
+| Tấm lớn nhất | 16384×16384 = **1 024 MB** | 1969² = 14.8 MB |
+| Art tĩnh (tổng mọi ảnh trong manifest) | 607 MB | 378 MB |
+| FPS / draw call (1 tab headless) | 58 / 112 | 58 / 112 |
+
+**Nguyên nhân chính** — `ground.filters` và `decor.filters` đặt bộ lọc màu lên container trải
+khắp bản đồ 12 000×12 000. PixiJS dựng render texture bằng cỡ container, làm tròn lên lũy
+thừa 2 là 16 384² ×4 byte = 1 GB cho **một** tấm. Laptop GPU tích hợp có `MAX_TEXTURE_SIZE`
+8 192 hoặc thiếu VRAM nên cấp phát hỏng. Sửa bằng `filterArea` bám khung nhìn — bộ lọc chỉ
+đổi màu từng điểm ảnh, không lấy mẫu điểm bên cạnh, nên cắt vùng cho kết quả y hệt.
+
+**Art thừa cỡ** — đo cỡ vẽ thật rồi mới cắt:
+
+| Thứ | Ảnh nguồn | Vẽ ra màn hình | Kết luận |
+|---|---|---|---|
+| Nhân vật | 256 px | 87 px (Luyện Khí) / 30 px (Đạo Tổ) | → 128 px, 220 → 55 MB |
+| boulder | 1024 px | rộng TB 208 đơn vị bản đồ | → 512 px, 80 → 20 MB |
+| items / buffs / decor | 256 px | 54–69 px | → 128 px |
+| **cổng, tường, quầy hàng** | 512 px | 220–360 px | **giữ nguyên** — 512 là đúng cỡ |
+
+Dòng cuối là chỗ đáng nhớ: nếu cắt theo cảm giác "cái gì cũng to quá" thì đã cắt nhầm cổng
+và tường xuống 256 và làm rỗ hình ở mức thu phóng gần.
+
+**Vì sao không kịch bản nào trong S1–S5 bắt được**: cả năm chạy trên máy có GPU rời, nuốt
+được 1 GB. Đây chính là lý do S6 tồn tại.
+
+### Lượt #7 — Mở telemetry trên `:9999` (2026-10-30, commit `d34def5`)
+
+Không phải một lượt tối ưu — là lượt **bật dụng cụ đo**. Ghi vào sổ vì nó đổi cách mọi lượt
+sau này được đo.
+
+Chạy kiểm chứng đầu-cuối 45 giây trên `:9999`: 1 phiên, 4 mẫu, đủ 7 mục §4.1, nhận đúng
+nhóm thiết bị, và mục 5 ghép được client ↔ server (tick p95 1.68 ms lúc client tụt khung).
+
+Ngưỡng §4.3 tự báo ngay hai thứ: **12 khung placeholder** và **9 lần respawn trong 2 giây** —
+cả hai là phần dư của NETCODE bước 2a mà bảng #5 trước đó ghi nhầm là "0 ✅".
+
+Chi phí đo được: **không có mẫu nào vượt 1 KB/s**, và FPS trong lượt có telemetry không khác
+lượt không có (58–59 cả hai) — đạt ràng buộc §1.1 và §1.2.
 
 ### Mẫu — copy cho mỗi lượt
 
@@ -201,7 +274,7 @@ Việc tiếp theo đề xuất: <1–3 việc, xếp theo lợi ích / công s�
 |---|---|---|---|---|---|
 | B1 | ItemsAdded dồn 1 gói khi camera lùi xa | Gói 38 KB, nghẽn mạng yếu | Lượt #0 | **Đóng** — gói 38.3 → 6.8 KB | #4 |
 | B2 | Server tick vượt ngân sách khi 10 Đạo Tổ chụm | Lag server | Lượt #0 | **Đóng** — tick 11.45 → 1.56 ms | #4 |
-| B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Trước **38 lần respawn/30s · 462/596 khung placeholder** → sau **0 / 0** (`flicker.mjs`, bot đi qua lại mép khung nhìn 30s) | **Đóng** bằng bản rẻ ở client; bước 3 sẽ thay bằng `Despawn` tường minh | #5 |
+| B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Trên server test: **38 → 0** respawn, **462 → 0** khung placeholder. Nhưng trên `:9999` THẬT vẫn **12 khung placeholder · 13.5 respawn/phút** (telemetry, dòng #7) và **3/0/1/1/0 respawn qua 5 lượt `flicker.mjs`** | **Mở lại.** Phần dễ đã xong; còn View Pool + `DescRequest` ở bước 2b | #5, #7 |
 | B4 | Băng thông game thật 61.7 KB/s | Mạng yếu | Lượt #0b | Mở — S2 còn **45.5 KB/s đỉnh** ở tab Đạo Tổ (ngân sách 40) | – |
 | B5 | Gói snapshot 6.8 KB vs ngân sách mới 6 KB | Mạng yếu | Lượt #4 | Mở — cần Protocol v2 nhị phân (NETCODE bước 3) | – |
 | **B6** | **Bài đo S3 không nâng được Đạo Tổ**; draw call đọc ra 0 | Không đánh giá được kịch bản nặng trên mạng yếu | Lượt #4 | Mở — **phải sửa trước khi tin số S3** | – |
