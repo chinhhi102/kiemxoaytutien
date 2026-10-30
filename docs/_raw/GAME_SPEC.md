@@ -4,6 +4,8 @@
 > Mọi con số nằm trong `config/game.json` (mục 16) — **không hardcode**.
 > Art/animation prompts: `docs/ART_PROMPTS.md`. Hướng dẫn setup: `docs/SETUP_GUIDE.md`.
 
+**Thay đổi v6.3:** điểm độ giật tách anim lặp / anim một lần (điểm "lạc lõng"); thứ tự sửa hoạt ảnh B → C → A (§12.5).
+
 **Thay đổi v6.2:** va kiếm xét từ vòng ngoài vào cho tới khi đủ 1 vòng đầy (sửa lỗi mài tắc khi vòng ngoài còn kiếm lẻ) (§13.4). NETCODE_SPEC lên v1.1.
 
 **Thay đổi v6.1:** tên bot giống người thật (1 000 tên trong config/bot_names.txt, luật chọn tên & hành vi khi chết, §9.4); hoạt ảnh liền mạch — một thân nhiều khuôn mặt, chuẩn hóa frame tự động, bộ điều khiển anim mượt (§12.5).
@@ -915,7 +917,7 @@ Thay vòng tròn số "14" ở góc trên trái bằng **ảnh đại diện nh�
 
 **Vấn đề**: các frame sinh bằng AI lệch nhau (to nhỏ, vị trí, dáng, nét vẽ khác nhau) → nhân vật "giật, nhảy lung tung". Mỗi mood (run / chase / flee) lại là 1 bộ frame AI riêng → đổi mood là đổi cả dáng người, nhìn như 3 nhân vật khác nhau.
 
-**Giải pháp gồm 3 lớp:**
+**Giải pháp gồm 3 lớp — thứ tự làm: B → C → A** (B chữa gốc vì phần lớn điểm giật đến từ frame lệch nhau; C làm mượt phần còn lại; A cần art mới nên làm sau):
 
 **A. Một thân, nhiều khuôn mặt** (bỏ việc mỗi mood một bộ chạy riêng)
 - Mỗi nhân vật chỉ có **1 chu kỳ chạy** (`run`, 6 frame) và **1 chu kỳ đứng** (`idle`, 4 frame) cho phần thân.
@@ -928,7 +930,10 @@ Thay vòng tròn số "14" ở góc trên trái bằng **ảnh đại diện nh�
 2. **Cùng tỉ lệ cho cả animation**: đo chiều cao phần đầu+thân (bỏ tay chân) từng frame, lấy **trung vị**, co giãn mọi frame của animation về cùng chiều cao đó (không co giãn từng frame riêng lẻ).
 3. **Neo đầu**: vị trí đầu giữa các frame liên tiếp không được lệch quá 4 px (ngoài nhịp nhún); lệch hơn → căn lại hoặc đánh dấu frame hỏng.
 4. **Cùng bảng màu & nét viền**: lượng tử hóa về palette của nhân vật (ART_PROMPTS §5), chuẩn hóa độ dày viền.
-5. **Điểm "độ giật"**: so từng cặp frame liên tiếp (lệch tâm, lệch chiều cao, khác màu) → điểm 0–100. Frame vượt ngưỡng → báo đỏ trong `assets:report`, đề xuất sinh lại riêng frame đó.
+5. **Điểm "độ giật"** — tách 2 nhóm:
+   - **Anim lặp** (idle, run, chase, flee, float...): so từng cặp frame liên tiếp (lệch tâm, lệch chiều cao, khác màu) → điểm 0–100, đọc **điểm trung bình**. Ngưỡng đỏ 45 (tạm, chỉnh theo mắt chủ dự án).
+   - **Anim một lần** (hit, death, levelup, breakthrough, teleport, skill...): những anim này **cố ý biến hình mạnh**, nên dùng điểm **"lạc lõng"** — bước nhảy của 1 frame lớn gấp mấy lần bước nhảy thông thường của chính animation đó. Ngưỡng đỏ 45.
+   - Frame vượt ngưỡng → báo đỏ trong `assets:report`, chỉ đích danh frame nên sinh lại.
 6. Xuất GIF xem trước + ảnh **onion-skin** (chồng mờ các frame) để duyệt bằng mắt.
 
 **C. Bộ điều khiển hoạt ảnh lúc chạy (client)**

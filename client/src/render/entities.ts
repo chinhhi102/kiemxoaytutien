@@ -123,10 +123,24 @@ function itemTexture(it: ItemState): Texture | null {
     return assets.texture(`items/orb_${size}.png`);
   }
   if (it.k === 'sword' || it.k === 'bundle') {
-    return null; // bundle has no art in ART_PROMPTS yet; sword art is drawn inside the placeholder below
+    // Cả hai KHÔNG đi qua hàm này:
+    //   - `sword` có nhánh riêng trong `drawItem` (dùng `items/sword.png`).
+    //   - `bundle` vẽ bằng Graphics trong `placeholder()` — ART_PROMPTS chưa có job cho nó.
+    // Chú thích cũ ở đây nói "sword art is drawn inside the placeholder below" là SAI:
+    // placeholder của kiếm chỉ vẽ vòng tròn trắng + thanh nâu, không dán ảnh nào.
+    return null;
   }
   if (it.k === 'chest') {
     return assets.frames('items/chest', 'idle')[0] ?? null;
+  }
+  // Bí Kíp nằm trong `items/`, KHÔNG phải `buffs/`.
+  //
+  // Dòng cuối hàm này đoán đường dẫn từ tên loại (`buffs/<loại>.png`), đúng cho 7 loại buff
+  // nhưng sai cho Bí Kíp — và sai trong im lặng: không tìm thấy ảnh thì rơi về placeholder,
+  // y như lúc chưa vẽ xong art. Ảnh đã có từ lâu ở `items/skill_scroll.png`, chỉ là không ai
+  // nhìn tới. Chủ dự án phát hiện bằng mắt trong game ngày 30/10.
+  if (it.k === 'skill_scroll') {
+    return assets.texture('items/skill_scroll.png');
   }
   return assets.texture(`buffs/${it.k}.png`);
 }

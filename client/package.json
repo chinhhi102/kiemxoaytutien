@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "assets:report": "node --no-warnings scripts/assets-report.ts",
     "check:collision": "node --no-warnings --experimental-strip-types scripts/collision-check.ts",
-    "check:telemetry-off": "node --no-warnings --experimental-strip-types scripts/telemetry-off.ts"
+    "check:telemetry-off": "node --no-warnings --experimental-strip-types scripts/telemetry-off.ts",
+    "check:items": "node --no-warnings --experimental-strip-types scripts/items-check.ts"
   },
   "dependencies": {
     "@msgpack/msgpack": "3.1.3",

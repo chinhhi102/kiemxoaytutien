@@ -229,3 +229,15 @@ Anh thấy chém người cấp Tiên không có Tiên khí rơi ra. Spec §3.4 
 7. AOI giữ 2s → **đồng ý**: bản rẻ ở client trước, bước 3 thay bằng `Despawn` tường minh. (spec v1.2 §8)
 
 Kế hoạch (b) **duyệt**. Bắt đầu Bước 2a → 2b ngay. Bài đo `flicker.mjs` phải có bot đi qua lại mép khung nhìn 30s (như em đã lưu ý), ghi trước/sau vào PERF_LOG.
+
+---
+
+## Trả lời bảng điểm độ giật (CHANGES_v6_1 mục 5)
+
+1. **Ngưỡng 45: giữ tạm.** Tôi sẽ tự kiểm bằng phím `J` và báo lại nếu cần chỉnh. Để dễ kiểm, thêm vào chế độ `J`: phím `[` / `]` chuyển qua lần lượt từng animation trong bảng (xếp theo điểm), phát lặp chậm 0.5× ngay giữa màn hình, kèm điểm — tôi xem nhanh top 10 và vài con điểm ~30 để chốt ngưỡng.
+2. **Đồng ý tách 2 nhóm** (anim lặp đọc TB; anim một lần đọc "lạc lõng"). Spec GAME_SPEC v6.3 §12.5 B.5 đã ghi lại.
+3. **Đảo thứ tự: B → C → A.**
+   - **B trước** (chuẩn hóa frame trong `tools/atlas-pack`): chạy cho toàn bộ art, rồi **chấm lại** bảng điểm. Gửi tôi bảng trước/sau + GIF trước/sau của co_ba_ganh `idle` và dep_lao `idle`.
+   - Anim nào **sau B vẫn đỏ** → đó là do bản thân frame vẽ khác dáng, không chuẩn hóa được: đưa vào danh sách sinh lại (ART_JOBS), ghi rõ frame nào. Dự đoán: co_ba_ganh `idle`, a_hon `teleport_in_01`, ong_ba_vong `realm_drop_05`.
+   - Rồi **C** (bộ điều khiển: crossfade, giữ pha, fps theo tốc độ, lật có trễ, chuyển động phụ).
+   - **A** (một thân nhiều mặt) để sau cùng vì cần art mới.

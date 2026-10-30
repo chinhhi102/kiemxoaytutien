@@ -267,7 +267,14 @@ func itemJobs() []Job {
 	sprite := func(name, out string, size int, prompt string) Job {
 		return Job{Name: name, Priority: 0, Mode: modeSprite, Out: out, W: size, H: size, Pivot: "center", Prompt: styleObject + " " + prompt + negative}
 	}
-	jobs := []Job{sprite("item_sword", "items/sword.png", 128, "A glossy transparent soap bubble containing a small glowing sword, shiny highlight.")}
+	jobs := []Job{
+		sprite("item_sword", "items/sword.png", 128, "A glossy transparent soap bubble containing a small glowing sword, shiny highlight."),
+		// Bó Kiếm: vật phẩm DUY NHẤT còn vẽ tay bằng Graphics (ba lưỡi chéo buộc dây đỏ).
+		// ART_PROMPTS chưa có job cho nó — thêm ở đây, chờ chủ dự án chốt đưa vào spec
+		// (đã ghi vào docs/QUESTIONS.md). Cùng cỡ 128 như item_sword vì vẽ ra cùng kích thước.
+		sprite("item_bundle", "items/bundle.png", 128,
+			"A bundle of three small glowing swords crossed together and tied with a red cloth band, inside a glossy transparent soap bubble, shiny highlight."),
+	}
 	for _, c := range []struct{ id, color string }{{"orb_small", "green"}, {"orb_medium", "blue"}, {"orb_large", "gold"}} {
 		jobs = append(jobs, sprite("item_"+c.id, "items/"+c.id+".png", 128, "A glowing "+c.color+" spirit orb gem, sparkly, round."))
 	}

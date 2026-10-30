@@ -108,6 +108,13 @@ class App {
         this.hud.showBanner(this.animInfo ? STR.animInfoOn : STR.animInfoOff, 1.5);
         return;
       }
+      if (this.playing && this.animInfo && (e.code === 'BracketLeft' || e.code === 'BracketRight') && !e.repeat) {
+        // ANSWERS mục 1: đi lần lượt qua từng animation theo thứ tự bảng điểm để chủ dự án
+        // chốt ngưỡng đỏ bằng mắt.
+        this.scene.stepAnimViewer(e.code === 'BracketRight' ? 1 : -1);
+        e.preventDefault();
+        return;
+      }
       if (this.playing && e.code === 'F3' && !e.repeat) {
         this.hud.togglePerf(); // spec §13.6: bảng đo bật/tắt bằng F3
         e.preventDefault();

@@ -1,4 +1,5 @@
 import { Application, Container } from 'pixi.js';
+import { AnimViewer } from './animviewer';
 import { BobaOverlay } from './boba';
 
 import { sound } from '../audio/sound';
@@ -131,7 +132,9 @@ export class GameScene {
     this.rings.sortableChildren = true;
     // Lớp trân châu nằm TRÊN cảnh nhưng vẫn DƯỚI HUD (HUD là DOM, không phải Pixi), đúng
     // yêu cầu "không che HUD" của spec §6.3.
-    this.app.stage.addChild(this.camera, this.breakthrough.overlay, this.boba.root);
+    // Bộ xem animation nằm TRÊN CÙNG và ngoài camera: nó là khung xem cố định giữa màn
+    // hình, không phải thứ nằm trong thế giới (ANSWERS mục 1).
+    this.app.stage.addChild(this.camera, this.breakthrough.overlay, this.boba.root, this.animViewer.root);
     this.boba.resize(this.app.screen.width, this.app.screen.height);
     this.app.renderer.on('resize', (w: number, h: number) => this.boba.resize(w, h));
   }
@@ -511,6 +514,11 @@ export class GameScene {
   /** showAnimInfo bật/tắt lớp chữ debug của phím `J` trên MỌI nhân vật đang vẽ. */
   showAnimInfo(on: boolean): void {
     this.animInfoOn = on;
+    if (on) {
+      this.animViewer.show(this.app.screen.width, this.app.screen.height);
+    } else {
+      this.animViewer.hide();
+    }
     for (const p of this.players.values()) {
       p.showAnimInfo(on);
     }
@@ -518,6 +526,13 @@ export class GameScene {
 
   /** animInfoOn: giữ trạng thái để nhân vật MỚI xuất hiện cũng bật sẵn, không phải bấm lại. */
   private animInfoOn = false;
+  /** animViewer: khung xem từng animation của chế độ `J` (phím `[` / `]`). */
+  readonly animViewer = new AnimViewer();
+
+  /** stepAnimViewer đi tới / lùi một animation trong bảng điểm. */
+  stepAnimViewer(d: number): void {
+    this.animViewer.step(d);
+  }
 
   drawStats(): { charsInView: number; swordsDrawn: number; placeholder: boolean } {
     let swordsDrawn = 0;

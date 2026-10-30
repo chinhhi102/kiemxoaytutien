@@ -17,8 +17,18 @@ interface AnimScore {
   outlier: number;
 }
 
+/** JitterEntry là một dòng trong bảng điểm, dùng cho bộ xem `[` / `]`. */
+export interface JitterEntry {
+  char: string;
+  anim: string;
+  loop: boolean;
+  score: number;
+}
+
 /** scores[char][anim] = điểm. Rỗng cho tới khi `loadJitter()` chạy xong. */
 const scores = new Map<string, number>();
+/** ordered: cùng dữ liệu nhưng XẾP THEO ĐIỂM giảm dần — thứ tự đi của phím `[` / `]`. */
+let ordered: JitterEntry[] = [];
 let loaded = false;
 
 function key(char: string, anim: string): string {
@@ -46,11 +56,21 @@ export async function loadJitter(): Promise<void> {
     for (const a of data.anims ?? []) {
       // Anim lặp đọc theo điểm trung bình, anim một lần đọc theo điểm "lạc lõng" — đúng như
       // bảng của `artgen jitter`, vì hai nhóm không so được với nhau bằng cùng một con số.
-      scores.set(key(a.char, a.anim), a.loop ? a.avg : a.outlier);
+      const score = a.loop ? a.avg : a.outlier;
+      scores.set(key(a.char, a.anim), score);
+      ordered.push({ char: a.char, anim: a.anim, loop: a.loop, score });
     }
+    // Tệ nhất lên đầu: bấm `]` lần đầu là thấy ngay con đáng xem nhất, không phải lướt qua
+    // ba chục animation ổn trước khi tới cái cần xem.
+    ordered.sort((x, y) => y.score - x.score);
   } catch {
     // Không có file (chưa chạy `artgen jitter`) thì phím J vẫn chạy, chỉ không có cột điểm.
   }
+}
+
+/** animList trả về toàn bộ bảng điểm đã xếp hạng, cho bộ xem `[` / `]`. */
+export function animList(): JitterEntry[] {
+  return ordered;
 }
 
 /** animJitter trả về điểm của một animation, hoặc null nếu chưa có số liệu. */
