@@ -624,3 +624,32 @@ Hiệu năng: 40 bot, bản đồ thật → ~0.16 ms/tick (mục tiêu < 3 ms).
   redis) thì Chrome báo `ERR_NETWORK_CHANGED` và tab rớt liên tục → dừng container đó trước khi đo.
   Chạy Chrome trong docker không giải quyết được vì không có GPU (vẽ bằng CPU, 800% CPU, tab 2 không mở nổi).
 - Log staging có `tick chậm ~27 ms` do AI bot (25 ms) ở khu Trúc Lâm Mê Cung khi phòng không có người — cần xem.
+
+## Đụng file giữa hai hướng (worktree song song, 30/10/2026)
+
+Hai hướng chạy trên hai nhánh/worktree riêng (`kx-netcode` ← `netcode-2a`, `kx-anim` ←
+`anim-v61`). Phân chia sở hữu để không giẫm chân:
+
+| File | Chủ sở hữu | Ghi chú |
+|---|---|---|
+| `client/src/net/state.ts` | **A** | vòng đời entity, giữ 2 s |
+| `client/src/render/scene.ts` — tạo/huỷ/pool/fade view | **A** | |
+| `client/src/render/player.ts` — `setCharacter`, mờ vào | **A** | ⚠ **đụng**: hướng B sẽ sửa bộ điều khiển hoạt ảnh trong CÙNG file |
+| `server/internal/room/bots.go`, `botnames.go` | **B** | tên bot §9.4 |
+| `server/internal/config/config.go` — nạp `bot_names.txt` | **B** | |
+| `tools/atlas-pack` | **B** | chưa đụng |
+
+**`player.ts` là file duy nhất cả hai cần.** Hướng A đã merge trước (`1695b15`), hướng B
+rebase sau — đúng thứ tự chủ dự án định. Khi hướng B làm bộ điều khiển hoạt ảnh, phần A
+đã nằm sẵn trong `main` nên chỉ cần rebase, không phải gộp tay.
+
+Thứ tự merge: **A (2a) ✅ → B1 tên bot ✅ → A (2b) → B hoạt ảnh** (sau khi chủ dự án duyệt
+bảng điểm độ giật).
+
+### Một cái bẫy khi chạy song song
+
+Hai lượt `go test ./...` đỏ ở `TestRemovalReportedEvenWhenSlotReused` hoá ra **không phải
+lỗi sản phẩm cũng không phải lỗi test**: tôi sửa `config/game.json` bằng `perl -i` trong
+lúc test đang build, nên test đọc phải file viết dở (thiếu `pickup_r` → vòng nhặt 0 → đúng
+triệu chứng "chưa nhặt được viên"). Đo lại dưới đúng điều kiện cũ: **0/4 lượt đỏ**.
+→ Đừng sửa `config/` trong lúc test đang chạy.

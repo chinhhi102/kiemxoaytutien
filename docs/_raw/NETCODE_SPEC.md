@@ -1,4 +1,4 @@
-# KIẾM XOAY TU TIÊN — Spec tối ưu: Giao thức client–server & Cache nhiều lớp (v1.1)
+# KIẾM XOAY TU TIÊN — Spec tối ưu: Giao thức client–server & Cache nhiều lớp (v1.2)
 
 > **v1.2**: §4.6 vị trí người chơi (của mình giữ chính xác cao), §4.9 schema chung + bài đối chiếu mã hóa bắt buộc, ngân sách gói 8 KB tạm thời tới hết bước 3, AOI giữ 2s ở client trước rồi thay bằng `Despawn` ở bước 3.
 > **v1.1** (sau báo cáo `docs/NETCODE_PLAN.md`): sửa nguyên nhân nhấp nháy/placeholder trong §0, đổi thứ tự §8 (bước 2 trước), trần texture theo thiết bị (§5 L1), luật an toàn cho Service Worker (§5 L3).
