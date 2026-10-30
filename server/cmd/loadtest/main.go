@@ -13,6 +13,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -121,7 +122,20 @@ func main() {
 	secs := flag.Float64("secs", 20, "số giây game cần đo")
 	seed := flag.Int64("seed", 1, "random seed")
 	cpuProf := flag.String("cpuprofile", "", "ghi hồ sơ CPU ra file này để chạy `go tool pprof`")
+	// `--scenario S1` đặt sẵn đúng bộ tham số của kịch bản chuẩn trong PERF_LOG §1.
+	//
+	// Có cái này thì không ai phải nhớ "S1 là 40 người, 10 Đạo Tổ, 120 giây" — và quan
+	// trọng hơn: hai lần đo cách nhau một tuần chắc chắn cùng tham số. Quy tắc vàng của
+	// PERF_LOG là chỉ so các lần đo CÙNG kịch bản, mà gõ tay thì sớm muộn cũng lệch.
+	scenario := flag.String("scenario", "", "kịch bản chuẩn PERF_LOG: S1")
 	flag.Parse()
+	switch *scenario {
+	case "":
+	case "S1":
+		*players, *tien, *secs = 40, 10, 120
+	default:
+		log.Fatalf("kịch bản %q không có; `loadtest` chỉ chạy S1 (xem docs/PERF_LOG.md §1)", *scenario)
+	}
 
 	if *cpuProf != "" {
 		f, err := os.Create(*cpuProf)

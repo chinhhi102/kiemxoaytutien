@@ -40,10 +40,21 @@ const REMOTE = args.url !== undefined;
 const ORIGIN = REMOTE ? args.url.replace(/\/+$/, '') : `http://127.0.0.1:${PORT}`;
 const SPAWN = !REMOTE && args['no-spawn'] === undefined;
 const OUT_TAG = REMOTE ? '-staging' : '';
-const TABS = Number(args.tabs ?? 10);
-const TIEN_TABS = Number(args.tien ?? 5);
-const WARMUP_S = Number(args.warmup ?? 30);
-const FIGHT_S = Number(args.fight ?? 60);
+// Kịch bản chuẩn PERF_LOG §1. `--scenario S2` đặt sẵn tham số để hai lần đo cách nhau một
+// tuần chắc chắn giống nhau — quy tắc vàng của PERF_LOG là chỉ so các lần đo CÙNG kịch bản,
+// mà gõ tay `--tabs 10 --warmup 60 --fight 60` thì sớm muộn cũng lệch một con số.
+//
+// S2 = mạng thường, S3 = cùng kịch bản nhưng 4G yếu; chọn bằng `--net normal|slow4g`.
+const SCENARIOS = { S2: { tabs: 10, tien: 5, warmup: 60, fight: 60 } };
+const SC = args.scenario ? SCENARIOS[args.scenario] : null;
+if (args.scenario && !SC) {
+  console.error(`kịch bản ${args.scenario} không có; browsertest chỉ chạy S2 (xem docs/PERF_LOG.md §1)`);
+  process.exit(2);
+}
+const TABS = Number(args.tabs ?? SC?.tabs ?? 10);
+const TIEN_TABS = Number(args.tien ?? SC?.tien ?? 5);
+const WARMUP_S = Number(args.warmup ?? SC?.warmup ?? 30);
+const FIGHT_S = Number(args.fight ?? SC?.fight ?? 60);
 const BASE = `${ORIGIN}/?debug=true`;
 
 // 4G yếu (spec yêu cầu): trễ 100 ms, 1.6 Mbps xuống, 750 Kbps lên.
@@ -394,10 +405,30 @@ async function runOnce(label, slow) {
   }
   console.log(`  ${tien.length} tab lên Đạo Tổ, chụm lại đánh nhau ${FIGHT_S}s...`);
   phase = 'fight';
-  const target = await tabs[0].page.evaluate(() => {
-    const m = window.kx.world.me();
-    return { x: m.x, y: m.y };
-  });
+  // Chỗ chụm quân: hỏi tab ĐẦU TIÊN còn đọc được, không cố định tab 0.
+  //
+  // Một tab có thể mất ngữ cảnh WebGL giữa chừng (10 tab tranh GPU, nhất là lúc bóp 4G);
+  // `glrecover` sẽ tải lại trang, và trong lúc đó `window.kx` chưa có. Bản cũ đọc thẳng
+  // `tabs[0]` nên chỉ một tab hỏng là **cả bài đo chết**, mất sạch số liệu của chín tab
+  // còn lại — đã xảy ra đúng vậy ở lượt S3 đầu tiên.
+  let target = null;
+  for (const t of tabs) {
+    target = await t.page
+      .evaluate(() => {
+        const m = window.kx?.world?.me?.();
+        return m ? { x: m.x, y: m.y } : null;
+      })
+      .catch(() => null);
+    if (target) {
+      break;
+    }
+  }
+  if (!target) {
+    console.log('  BỎ LƯỢT: không tab nào đọc được vị trí (mất ngữ cảnh WebGL?)');
+    clearInterval(collector);
+    await browser.close();
+    return null;
+  }
   const fightUntil = Date.now() + FIGHT_S * 1000;
   let shot = false;
   let beat = 0;
@@ -413,9 +444,14 @@ async function runOnce(label, slow) {
     }
     await sleep(500);
     if (!shot && Date.now() > fightUntil - (FIGHT_S * 1000) / 3) { // ~2/3 pha, lúc đông nhất
-      await mkdir(resolve(REPO, 'docs/perf'), { recursive: true });
-      await tien[0].page.screenshot({ path: resolve(REPO, `docs/perf/browsertest${OUT_TAG}-${label}.png`) });
       shot = true;
+      // Ảnh chụp là thứ phụ, KHÔNG được làm hỏng phép đo. Mười tab đang tranh nhau GPU nên
+      // `screenshot` có lúc quá 30 giây rồi ném lỗi — và lỗi đó từng làm cả bài đo chết ở
+      // bước cuối, mất sạch số liệu vừa thu được trong hai phút.
+      await mkdir(resolve(REPO, 'docs/perf'), { recursive: true });
+      await tien[0].page
+        .screenshot({ path: resolve(REPO, `docs/perf/browsertest${OUT_TAG}-${label}.png`), timeout: 15000 })
+        .catch((e) => console.log(`  (bỏ qua ảnh chụp: ${e.message.split('\n')[0]})`));
     }
   }
 
@@ -525,13 +561,19 @@ const server = SPAWN ? await startServer() : null;
 const runs = [];
 try {
   // --only mang-binh-thuong | 4g-yeu: chạy một lượt thôi, để dò lỗi cho nhanh.
-  const only = args.only;
+  // `--net normal|slow4g` là tên theo PERF_LOG §1 (S2 / S3), ánh xạ lên đúng cơ chế này:
+  // `--only X` nghĩa là CHỈ chạy lượt X.
+  const only = args.net === 'normal' ? 'mang-binh-thuong'
+    : args.net === 'slow4g' ? '4g-yeu'
+    : args.only;
   if (only !== '4g-yeu') {
-    runs.push(await runOnce('mang-binh-thuong', false));
-    await writeReport(runs);
+    const rA = await runOnce("mang-binh-thuong", false);
+    if (rA) { runs.push(rA); }
+    if (runs.length) { await writeReport(runs); }
   }
   if (only !== 'mang-binh-thuong') {
-    runs.push(await runOnce('4g-yeu', true));
+    const rB = await runOnce("4g-yeu", true);
+    if (rB) { runs.push(rB); }
     await writeReport(runs);
   }
 } finally {

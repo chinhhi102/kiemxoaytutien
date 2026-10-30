@@ -4,6 +4,8 @@
 > Mọi con số nằm trong `config/game.json` (mục 16) — **không hardcode**.
 > Art/animation prompts: `docs/ART_PROMPTS.md`. Hướng dẫn setup: `docs/SETUP_GUIDE.md`.
 
+**Thay đổi v6.1:** tên bot giống người thật (1 000 tên trong config/bot_names.txt, luật chọn tên & hành vi khi chết, §9.4); hoạt ảnh liền mạch — một thân nhiều khuôn mặt, chuẩn hóa frame tự động, bộ điều khiển anim mượt (§12.5).
+
 **Thay đổi v6.0:** tối ưu mạng/hiệu năng chuyển sang tài liệu riêng `NETCODE_SPEC.md` — đồng bộ theo khu, Room Shared Cache, Protocol v2, cache nhiều lớp, chống nhấp nháy/placeholder (§13.3).
 
 **Thay đổi v5.9:** làm rõ: chém người Tiên giới luôn rơi 30% Tiên khí mất ra đất, bất kể người chém là ai (§3.4).
@@ -722,8 +724,23 @@ on bot death:
   else: respawn bot sau 3s ở khu đang ít nhân vật nhất
 ```
 - Bot spawn **ngang hạng 11 của phòng** (`bots.spawn_rank = 11`): lấy cảnh giới + tầng của người đang đứng hạng 11 bảng phòng (theo Uy Danh); phòng chưa đủ 11 người thì lấy người cuối bảng. Không có trần cảnh giới. Số kiếm ngẫu nhiên [1, max].
-- Bot dùng tên + nhân vật ngẫu nhiên, **không vào leaderboard toàn cục**.
+- Bot **không vào leaderboard toàn cục** (server biết, người chơi không biết).
+- **Tên bot phải không phân biệt được với người thật** (§9.4).
 - Bot cũng dùng cổng: khi bỏ chạy (Flee) gần cổng, hoặc khu đang có quá ít mục tiêu/vật phẩm (xác suất thấp, cooldown 60s).
+
+### 9.4 Đặt tên bot
+
+- Nguồn: `config/bot_names.txt` — 1 000 tên theo đúng kiểu nickname game thủ Việt hay dùng: tên thật (có/không dấu, kèm năm sinh như `2k7`, `_09`), tên ở nhà (Tèo, Bống, Mít...), biệt danh tu tiên hài (Sư Huynh Nợ Tiền, Tán Tu Lang Thang...), câu nói đùa (Đừng gank em, Wifi hàng xóm...), tên tiếng Anh ghép (SleepyNinja, LazyPanda...), kiểu teencode chữ thường (`tho2k9`, `meo.22`), và một ít có ký tự trang trí ASCII (`_Max.`, `^^Vy_`). Không có chữ "bot", không có tên người nổi tiếng hay nhân vật có bản quyền.
+- **Ký tự trang trí chỉ dùng ASCII** (`_ . ~ ^ x`) vì BitmapFont của bảng tên (§12.3) có thể không có glyph ★ ♥ ✿. Tên người chơi thật có ký tự lạ ngoài font → vẽ bằng font dự phòng, không được hiện ô vuông.
+- **Luật chọn tên trong 1 room**:
+  - Rút ngẫu nhiên không lặp; không trùng tên bất kỳ người/bot nào đang trong room hoặc vừa rời trong 10 phút.
+  - 15% số lần: thêm biến thể nhỏ (đổi `_` ↔ `.`, thêm 1–2 chữ số) để tên không lặp y hệt giữa các room.
+  - Phân bố nhân vật bot giống phân bố nhân vật người chơi chọn (lấy thống kê 7 ngày, chưa có thì đều).
+- **Hành vi giống người khi chết** (người thật chết → màn Tổng kết → bấm Chơi tiếp mất vài giây):
+  - 70%: hồi sinh **cùng tên** sau ngẫu nhiên 4–12s (như người bấm "Chơi tiếp"), vào khu ít người như người thật.
+  - 30%: "rời phòng" — bot biến mất, bot mới (tên mới) vào sau 5–20s.
+  - Thỉnh thoảng (5%) bot đứng yên 3–8s sau khi vào (như người đang đọc bảng hướng dẫn).
+- Kill feed, tin loan, danh hiệu, Uy Danh hiển thị cho bot y hệt người thật.
 
 ## 10. Bot AI
 
@@ -891,6 +908,38 @@ Thay vòng tròn số "14" ở góc trên trái bằng **ảnh đại diện nh�
 - Vương miện nhỏ trên khung nếu đang Top 1; ruy băng hạng nhỏ nếu Top 2–10.
 - Bị chém: khung rung + chớp đỏ. Đột phá: khung phát sáng + phình ra.
 - Chưa có art: dùng frame `idle_00` của nhân vật, tự cắt phần đầu (vùng trên 45% sprite) làm chân dung tạm.
+
+### 12.5 Hoạt ảnh liền mạch & tự nhiên
+
+**Vấn đề**: các frame sinh bằng AI lệch nhau (to nhỏ, vị trí, dáng, nét vẽ khác nhau) → nhân vật "giật, nhảy lung tung". Mỗi mood (run / chase / flee) lại là 1 bộ frame AI riêng → đổi mood là đổi cả dáng người, nhìn như 3 nhân vật khác nhau.
+
+**Giải pháp gồm 3 lớp:**
+
+**A. Một thân, nhiều khuôn mặt** (bỏ việc mỗi mood một bộ chạy riêng)
+- Mỗi nhân vật chỉ có **1 chu kỳ chạy** (`run`, 6 frame) và **1 chu kỳ đứng** (`idle`, 4 frame) cho phần thân.
+- Biểu cảm (bình thường, la hét, cười nham hiểm, hoảng, khóc, choáng...) là **lớp mặt riêng** chồng lên đầu (sprite mặt 6–8 cái, cùng kích thước, cùng vị trí neo). Đổi mood = **chỉ đổi mặt**, thân vẫn chạy liền mạch.
+- `chase` / `flee` khác `run` bằng **tư thế thủ tục** (procedural): chase ngả người tới trước 8° + hai tay xoa (lớp tay nếu có); flee ngả ra sau 6° + nảy cao hơn + giọt mồ hôi văng (particle).
+- Anim một lần (hit, levelup, breakthrough, death, respawn, teleport, skill) vẫn là frame riêng nhưng phải qua bước chuẩn hóa B.
+
+**B. Chuẩn hóa frame tự động** (`tools/atlas-pack`, chạy trên mọi frame trước khi ghép atlas)
+1. **Neo chân**: tìm đường đáy của 2 bàn chân, đặt về y = 460, căn giữa x theo **trung điểm hai chân** (không theo hộp bao — tay vung ra làm hộp bao lệch).
+2. **Cùng tỉ lệ cho cả animation**: đo chiều cao phần đầu+thân (bỏ tay chân) từng frame, lấy **trung vị**, co giãn mọi frame của animation về cùng chiều cao đó (không co giãn từng frame riêng lẻ).
+3. **Neo đầu**: vị trí đầu giữa các frame liên tiếp không được lệch quá 4 px (ngoài nhịp nhún); lệch hơn → căn lại hoặc đánh dấu frame hỏng.
+4. **Cùng bảng màu & nét viền**: lượng tử hóa về palette của nhân vật (ART_PROMPTS §5), chuẩn hóa độ dày viền.
+5. **Điểm "độ giật"**: so từng cặp frame liên tiếp (lệch tâm, lệch chiều cao, khác màu) → điểm 0–100. Frame vượt ngưỡng → báo đỏ trong `assets:report`, đề xuất sinh lại riêng frame đó.
+6. Xuất GIF xem trước + ảnh **onion-skin** (chồng mờ các frame) để duyệt bằng mắt.
+
+**C. Bộ điều khiển hoạt ảnh lúc chạy (client)**
+- **Chuyển mượt**: đổi animation có crossfade 80–120 ms (không cắt cứng).
+- **Giữ pha chu kỳ**: run ↔ chase ↔ flee dùng chung chu kỳ thân nên **không reset về frame 0** khi đổi mood.
+- **Tốc độ anim theo tốc độ chạy thật**: fps chu kỳ chạy = tốc độ di chuyển / độ dài bước chân → không bị "trượt chân" (chân bước chậm mà người lướt nhanh). Thiêu Đốt, Thần Hành, băng trơn đều tự khớp.
+- **Thời gian giữ tối thiểu**: mood giữ ít nhất 0.5 s (đã có), biểu cảm mặt giữ ít nhất 0.8 s.
+- **Quay đầu trái/phải**: không lật tức thì — co ngang 0.08 s (scale X 1 → 0.2) rồi lật và giãn lại; chỉ lật khi hướng đổi > 30° và giữ > 0.12 s (chống lật qua lại khi chạy dọc).
+- **Chuyển động phụ thủ tục** (áp lên mọi anim): nhún theo bước chạy (sóng sin đồng bộ pha chân), nghiêng người theo hướng rẽ (tối đa 6°), squash & stretch khi dừng/đáp đất (±6%), thở nhẹ khi đứng. Biên độ nhỏ, đồng nhất cho mọi nhân vật → cảm giác cùng 1 "chất".
+- **Không giật theo mạng**: trạng thái anim lấy từ vị trí đã **nội suy** (không từ gói tin thô); nhận mood mới từ server thì đợi tới mốc frame gần nhất mới chuyển.
+- Debug `?debug=true` phím `J`: hiện tên anim, frame, pha, điểm độ giật của nhân vật đang chọn.
+
+**Nâng cấp sau (nếu A–C vẫn chưa đủ)**: chuyển sang **rig cắt mảnh 2D** — từ 1 ảnh nhân vật chuẩn, cắt đầu / thân / 2 tay / 2 chân thành sprite riêng có điểm khớp, animation bằng xoay/dịch các mảnh trong code. Mọi frame dùng **đúng 1 bộ hình** nên tuyệt đối đồng nhất; đổi skin chỉ cần thay bộ mảnh.
 
 ### 12.2 Máu quái
 - **Thanh máu nhỏ** trên đầu quái (không còn số to đè lên mặt quái). Chỉ hiện khi quái đã mất máu; đổi màu xanh → vàng → đỏ theo % máu.
@@ -1147,6 +1196,10 @@ Sau mỗi milestone: chạy `go run ./cmd/sim` để xem cân bằng (thời gia
 - Vừa vào trận: hiện bảng mờ (nền 50%) giữa-dưới màn hình liệt kê điều khiển (di chuyển; Thiêu Đốt: Shift / nháy đúp giữ / 🔥; **Kỹ năng: Space / nút kỹ năng** (cần Bí Kíp); M minimap...). Tự mờ dần sau 5s (trùng thời gian bất tử) hoặc biến mất khi người chơi bắt đầu di chuyển.
 
 ## 17. Checklist test chấp nhận
+
+- [ ] Không có tên bot nào chứa "bot"; 2 bot trong cùng room không trùng tên; bot chết thì 70% quay lại cùng tên sau 4–12s.
+- [ ] Đổi run → chase → flee: thân chạy liên tục không reset frame, chỉ đổi mặt + tư thế; quay trái/phải không lật qua lại khi chạy dọc; tốc độ bước chân khớp tốc độ di chuyển.
+- [ ] `assets:report` có điểm độ giật mọi animation; không frame nào vượt ngưỡng trong build thật.
 
 - [ ] Thế giới 5 khu, mỗi khu 12 000²; không đi bộ sang khu khác được; 200 lượt qua cổng: ra đều các cổng còn lại, không bao giờ ra lại cổng vừa vào, ~80% sang khu khác.
 - [ ] Người mới vào spawn ở khu ít người nhất; tổng người + bot mỗi phòng vẫn 20, bot sinh vào khu ít nhân vật nhất.

@@ -94,6 +94,18 @@ animation "{ANIM_NAME}" in {N} sequential frames read left-to-right, top-to-bott
 Identical character in every cell, same size, feet aligned on same baseline, transparent background.
 ```
 
+### 4.3b Cách sinh mới (v6.1) — một thân, nhiều khuôn mặt
+
+Thay cho việc sinh `run`/`chase`/`flee` riêng (xem GAME_SPEC §12.5):
+1. **Thân không mặt**: `run` 6 frame + `idle` 4 frame, prompt thêm `face area left plain and neutral (closed mouth, simple eyes), same head position in every frame` — để lớp mặt chồng lên khớp.
+2. **Bộ mặt** (cùng 1 ảnh lưới 4×2, mỗi ô 256×256, chỉ phần mặt nhìn hơi nghiêng phải, cùng kích cỡ và vị trí mắt):
+   `neutral smug` · `screaming wide open mouth` · `evil grin narrowed eyes` · `panicked sweating bulging eyes` · `crying streams of tears` · `dizzy spiral eyes` · `shocked jaw drop` · `sleepy half-closed eyes`.
+   Prompt: `{STYLE} sprite sheet 4x2 grid of facial expressions of {CHARACTER_DESCRIPTION}, face only, identical head shape, size and eye position in every cell, 3/4 view facing right, transparent background`.
+3. Anim một lần (hit, death...) giữ nguyên bảng 4.4 nhưng **phải qua bước chuẩn hóa** của `tools/atlas-pack`.
+4. Duyệt bằng GIF + ảnh onion-skin; frame có điểm độ giật đỏ → sinh lại riêng frame đó.
+
+**Tùy chọn rig cắt mảnh (nâng cấp sau)**: 1 ảnh nhân vật tư thế chữ A (`A-pose, arms slightly away from body, legs apart, facing right 3/4, transparent background, 1024x1024`) rồi cắt thành đầu / thân / tay trái / tay phải / chân trái / chân phải (mỗi mảnh vẽ thêm phần khớp tròn ở chỗ nối).
+
 ### 4.4 Danh sách animation & keyframe
 
 | Anim | Frames | Loop | Mô tả từng frame (dán vào POSE_DESCRIPTION) |

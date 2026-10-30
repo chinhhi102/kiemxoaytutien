@@ -7,3 +7,9 @@ Anh đã đặt `docs/_raw/NETCODE_SPEC.md`. Đây là thay đổi kiến trúc 
 3. Protocol v2 chạy song song v1 sau cờ cho tới khi qua hết bài kiểm tra §7, rồi mới xóa v1.
 4. Bài kiểm tra §7 thành test tự động hoặc kịch bản `tools/browsertest` chạy được bằng 1 lệnh.
 5. CI/build: chặn build thật nếu thiếu asset bắt buộc (§5 "Hiển thị" mục 1).
+
+## Sổ số liệu hiệu năng
+6. Đặt `docs/PERF_LOG.md` + `docs/perf_log.csv` (anh gửi kèm). Điền máy đo chuẩn (§4). Viết `npm run perf:report` (hoặc `go run ./cmd/perfreport`) chạy S1–S3, in sẵn 1 dòng bảng + 1 dòng CSV.
+7. **Trước khi bắt đầu NETCODE bước 1**: chạy đủ S1–S5 trên code hiện tại → dòng #4 "Mốc chuẩn" (thay cho các dòng có dấu *). Mọi lượt sau so với mốc này.
+8. Mỗi bước NETCODE §8 = 1 lượt trong PERF_LOG, có khối chi tiết §5 (trước/sau, nút thắt có bằng chứng, bị chặn ở đâu, việc tiếp theo).
+9. CLAUDE.md đã thêm quy tắc 12 (anh gửi kèm bản mới).

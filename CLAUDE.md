@@ -42,3 +42,7 @@ Người sở hữu dự án KHÔNG rành setup kỹ thuật → giải thích n
     rồi dừng lại báo tôi. Câu nào đã trả lời thì chuyển sang docs/QUESTIONS_DONE.md để
     QUESTIONS.md chỉ còn việc đang chờ.
 11. Không bao giờ chờ art. Gameplay luôn ưu tiên trước; asset thiếu thì dùng placeholder tự động.
+12. Sau mỗi lượt tối ưu — và sau mọi thay đổi có thể ảnh hưởng hiệu năng (VFX, bản đồ,
+    kỹ năng…) — cập nhật `docs/PERF_LOG.md` (bảng §3, chi tiết §5, nút thắt §6) và
+    `docs/perf_log.csv`, theo đúng kịch bản chuẩn S1–S5. **Đo trước rồi mới sửa**; nút thắt
+    phải có số đo làm bằng chứng, không ghi phỏng đoán. Chỉ so các lần đo CÙNG kịch bản.
