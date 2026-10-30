@@ -359,6 +359,11 @@ var obstacles = []struct {
 	{"brick", "a short horizontal red brick wall segment with moss", 512, 512},
 	{"boulder", "a huge round grey boulder with cartoon crack lines", 512, 512},
 	{"stone_wall", "an ancient mossy horizontal stone wall with carved patterns", 512, 512},
+	// `bamboo_wall` THIẾU art từ lâu mà không ai biết: bản đồ Trúc Lâm Mê Cung dùng 300 cái,
+	// và chúng vẽ ra khung chữ nhật trắng. Chủ dự án nhìn thấy trong game ngày 30/10.
+	// `check:assets` cũ không bắt được vì nó kiểm danh mục art, còn `bamboo_wall` thì chưa
+	// bao giờ có trong danh mục — thiếu cái gì không có tên thì không có gì để thiếu.
+	{"bamboo_wall", "a wall of thick green bamboo poles tied together with rope, viewed from the side", 512, 512},
 }
 
 func obstacleJobs() []Job {

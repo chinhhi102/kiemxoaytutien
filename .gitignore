@@ -35,3 +35,9 @@ deploy/.build/
 # Game chỉ dùng `atlas.png`, không đọc thư mục này; và nó sinh lại được từ `frames/` bằng
 # một lệnh. Commit vào là gấp đôi dung lượng repo để lưu thứ máy tự dựng lại trong 2 phút.
 frames_norm/
+
+# Thư mục server LAN phục vụ (tools/deploy.sh dựng). Là bản SAO của client/dist + assets,
+# không phải nguồn — commit vào là nhân đôi mọi thứ.
+server/data/deploy/
+server/data/deploy.new/
+server/data/deploy.old/

@@ -44,14 +44,13 @@ export class Screens {
  * với nhân vật chỉ chiếm 72% và chân ghim ở y=460: thu về ô 40px thì người bé bằng hạt gạo
  * giữa một vùng trong suốt, nhìn như thẻ trống (ảnh chụp 30/10 — mười thẻ đều trắng trơn).
  *
- * Còn hai mức dự phòng: chưa có chân dung thì lấy khung hình toàn thân, chưa có gì cả thì
- * chấm tròn màu — để màn chọn không bao giờ trống trơn khi art chưa kịp.
+ * Chưa có chân dung thì chấm tròn màu — để màn chọn không bao giờ trống trơn khi art chưa kịp.
  */
 export function portrait(char: string, has: (p: string) => boolean, color: string): HTMLElement {
-  const file =
-    has(`characters/${char}/portrait_neutral.png`) ? `portrait_neutral.png`
-    : has(`characters/${char}/atlas.png`) ? `frames/idle_00.png`
-    : '';
+  // Chỉ dùng chân dung. Mức dự phòng cũ là `frames/idle_00.png`, nhưng `frames/` là ảnh
+  // nguồn: không có trong manifest, không được deploy → 404 và ô trống. Thiếu chân dung thì
+  // rơi thẳng xuống chấm tròn màu bên dưới, vẫn không bao giờ trống trơn.
+  const file = has(`characters/${char}/portrait_neutral.png`) ? `portrait_neutral.png` : '';
   if (file) {
     const img = h('img', 'portrait');
     img.src = `/assets/characters/${char}/${file}`;

@@ -82,6 +82,24 @@ export class AnimController {
   private squash = 0;
   private lastSpeed = 0;
 
+  /**
+   * reset xoá sạch trạng thái, cho View Pool dùng lại controller với một entity khác.
+   *
+   * Quên gọi là bug im lặng và nặng: controller tưởng mood không đổi nên không báo đổi, thân
+   * không được dựng lại, rồi vòng vẽ ném lỗi và cả game đứng.
+   */
+  reset(): void {
+    this.anim = '';
+    this.prev = '';
+    this.fadeLeft = 0;
+    this.phase = 0;
+    this.moodAt = -Infinity;
+    this.flipLeft = 0;
+    this.lean = 0;
+    this.squash = 0;
+    this.lastSpeed = 0;
+  }
+
   /** current là animation đang vẽ. */
   get current(): string {
     return this.anim;

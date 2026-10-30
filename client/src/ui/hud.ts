@@ -329,7 +329,13 @@ export class Hud {
       return '';
     }
     const real = `characters/${this.char}/portrait_${want}.png`;
-    return assets.has(real) ? `/assets/${real}` : `/assets/characters/${this.char}/frames/idle_00.png`;
+    if (assets.has(real)) {
+      return `/assets/${real}`;
+    }
+    // Dự phòng là chân dung TRUNG TÍNH, không phải `frames/idle_00.png`: `frames/` là ảnh
+    // nguồn, không có trong manifest và không được deploy (xem tools/deploy.sh).
+    const neutral = `characters/${this.char}/portrait_neutral.png`;
+    return assets.has(neutral) ? `/assets/${neutral}` : '';
   }
 
   /**

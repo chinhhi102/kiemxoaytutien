@@ -297,8 +297,32 @@ export class PlayerSprite {
         this.setMood(mood);
       }
       const a = this.ctl.step(dt, speed, turn, this.animFps, now);
+      // CHỐT CHẶN: thân chưa dựng thì dựng ngay, đừng đọc `texture` của `null`.
+      //
+      // Bản đầu tôi chỉ gọi `setMood` khi bộ điều khiển cho phép đổi mood, nên có đúng một
+      // đường đi làm thân không bao giờ được dựng: view lấy lại từ pool bị xoá thân, nhưng
+      // bộ điều khiển vẫn nhớ mood CŨ — nó thấy "mood không đổi" nên không báo đổi, và
+      // `setMood` không chạy. Kết quả là `Cannot read properties of null (reading 'texture')`
+      // ném ra TRONG VÒNG VẼ, tức là cả game đứng. Chủ dự án dính ngày 30/10.
+      //
+      // Gốc rễ đã sửa ở `reuse()` (đặt lại bộ điều khiển), nhưng chốt chặn này vẫn giữ: một
+      // ngoại lệ trong vòng vẽ làm đứng toàn bộ game, nên ở đây không được phép có "đường đi
+      // nào đó mà thân chưa kịp dựng".
+      if (!this.body) {
+        this.mood = '';
+        this.setMood(mood);
+      }
+      if (!this.body) {
+        // Atlas không có animation nào dùng được: vẽ placeholder thay vì ném lỗi.
+        this.body = this.placeholderBody();
+        this.bodyBox.addChild(this.body);
+        return;
+      }
       const h = (r * CHAR_HEIGHT_PER_R) / ART_FILL; // world height of the whole 512 canvas
       const sp = this.body as AnimatedSprite;
+      if (!(sp instanceof AnimatedSprite) || !sp.texture) {
+        return;
+      }
       const k = h / sp.texture.height;
       sp.scale.set(a.flipX * k, k * a.scaleY);
       sp.position.set(0, r * FEET_BELOW_CENTER + a.bobY * r);
@@ -532,6 +556,10 @@ export class PlayerSprite {
       return false;
     }
     this.id = id;
+    // Đặt lại bộ điều khiển: nó nhớ animation của entity TRƯỚC. Không đặt lại thì entity mới
+    // mang mood giống entity cũ sẽ bị coi là "không đổi mood", `setMood` không chạy, và thân
+    // (vừa bị `setCharacter` xoá) không bao giờ được dựng lại.
+    this.ctl.reset();
     this.plate.rename(name);
     this.root.visible = true;
     this.root.alpha = 1;

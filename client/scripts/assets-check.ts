@@ -6,7 +6,7 @@
 // Khác `assets:report` ở chỗ: report LIỆT KÊ cho người đọc, còn cái này TRẢ MÃ LỖI cho máy.
 // Một danh sách thiếu asset in ra rồi build vẫn xanh thì chẳng chặn được gì — ngày 30/10 đội
 // test đã chơi một bản có 12 khung placeholder mà không ai biết.
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +40,43 @@ function requiredOf(e: CatalogEntry): string[] {
  */
 const BLOCKING = new Set(['Nhân vật', 'Quái', 'Vật phẩm', 'Vật cản', 'Kiếm']);
 
+/**
+ * mapObstacleKinds đọc MỌI loại vật cản mà bản đồ thật sự dùng.
+ *
+ * Vì sao phải đọc bản đồ thay vì tin vào danh mục art: ngày 30/10 chủ dự án nhìn thấy cả
+ * một rừng khung chữ nhật trắng trong "Trúc Lâm Mê Cung". Nguyên nhân là `bamboo_wall` —
+ * bản đồ dùng 300 cái mà KHÔNG CÓ art nào. Bài kiểm cũ không bắt được, vì nó kiểm "mọi mục
+ * trong danh mục đều có tệp", còn `bamboo_wall` thì chưa bao giờ nằm trong danh mục.
+ *
+ * Thiếu một thứ KHÔNG CÓ TÊN thì không có gì để mà thiếu. Nên phép kiểm phải xuất phát từ
+ * thứ game THẬT SỰ DÙNG, không phải từ danh sách ta tự khai.
+ */
+function mapObstacleKinds(): Map<string, number> {
+  const out = new Map<string, number>();
+  const dir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'maps');
+  if (!existsSync(dir)) {
+    return out;
+  }
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.tmj'))) {
+    const doc = JSON.parse(readFileSync(join(dir, f), 'utf8')) as {
+      layers?: { name?: string; objects?: { name?: string; type?: string; properties?: { name: string; value: unknown }[] }[] }[];
+    };
+    for (const layer of doc.layers ?? []) {
+      if (layer.name !== 'obstacles') {
+        continue;
+      }
+      for (const o of layer.objects ?? []) {
+        const props = Object.fromEntries((o.properties ?? []).map((p) => [p.name, p.value]));
+        const kind = String(props.art ?? props.kind ?? o.type ?? o.name ?? '');
+        if (kind) {
+          out.set(kind, (out.get(kind) ?? 0) + 1);
+        }
+      }
+    }
+  }
+  return out;
+}
+
 const blocking: { group: string; label: string; files: string[] }[] = [];
 const warn: { group: string; label: string; files: string[] }[] = [];
 let checked = 0;
@@ -53,7 +90,16 @@ for (const e of catalog()) {
   (BLOCKING.has(e.group) ? blocking : warn).push({ group: e.group, label: e.label, files: gone });
 }
 
-console.log(`Đã kiểm ${checked} tệp bắt buộc trong ${catalog().length} mục.`);
+// Loại vật cản bản đồ dùng mà không có art → khung chữ nhật trắng giữa màn hình.
+// `intact.png` là trạng thái luôn phải có; các trạng thái vỡ có thể thiếu mà vẫn chơi được.
+const kinds = mapObstacleKinds();
+for (const [kind, n] of kinds) {
+  if (!existsSync(join(ASSETS, 'obstacles', kind, 'intact.png'))) {
+    blocking.push({ group: 'Vật cản (bản đồ dùng)', label: `${kind} — ${n} chỗ trên bản đồ`, files: [`obstacles/${kind}/intact.png`] });
+  }
+}
+
+console.log(`Đã kiểm ${checked} tệp bắt buộc trong ${catalog().length} mục, và ${kinds.size} loại vật cản bản đồ dùng.`);
 if (warn.length > 0) {
   console.log(`\nThiếu ${warn.length} mục art KHÔNG chặn build (game bỏ qua, không vẽ placeholder):`);
   const byGroup = new Map<string, number>();

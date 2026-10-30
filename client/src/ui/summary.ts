@@ -18,9 +18,18 @@ export function summaryScreen(cfg: GameConfig, d: DeadMsg, myChar: string, act: 
   if (assets.has('ui/scroll.png')) {
     panel.classList.add('has-scroll');
   }
-  const ghost = assets.has(`characters/${myChar}/atlas.png`) ? h('img', 'ghost') : null;
+  // Hồn ma dùng CHÂN DUNG, không dùng `frames/death_07.png`.
+  //
+  // `frames/` là ảnh NGUỒN để ghép atlas — nó không có trong `manifest.json` và không được
+  // deploy (hơn 100 MB mà game không đọc tới). Trước đây đường dẫn này chạy được chỉ vì
+  // server phục vụ thẳng thư mục làm việc; từ lúc có `tools/deploy.sh` thì nó 404 và màn
+  // Tổng kết mất hình. Chân dung khóc hợp cảnh hơn và luôn có mặt.
+  const ghostFile = assets.has(`characters/${myChar}/portrait_cry.png`) ? 'portrait_cry.png'
+    : assets.has(`characters/${myChar}/portrait_neutral.png`) ? 'portrait_neutral.png'
+    : '';
+  const ghost = ghostFile ? h('img', 'ghost') : null;
   if (ghost) {
-    ghost.src = `/assets/characters/${myChar}/frames/death_07.png`;
+    ghost.src = `/assets/characters/${myChar}/${ghostFile}`;
     ghost.onerror = () => ghost.remove();
   }
   const realm = cfg.cultivation.realms[realmOf(cfg, d.peak_level)] ?? '';
