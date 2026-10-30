@@ -498,6 +498,23 @@ export class GameScene {
    * Có nó thì lúc ai đó kêu lag là biết ngay nghẽn ở đâu — khung hình thấp mà `vẽ` nhỏ là
    * nghẽn mạng chứ không phải máy yếu, còn `vẽ` cao là do quá nhiều thứ trên màn hình.
    */
+  /**
+   * drawStats là những con số chỉ đếm được bằng cách duyệt các nhân vật ĐANG VẼ
+   * (TELEMETRY_SPEC §2.2). Để ở đây chứ không để `players` lộ ra ngoài: vòng lặp nằm cạnh
+   * dữ liệu, và không ai ngoài scene chạm được vào bảng sprite.
+   */
+  drawStats(): { charsInView: number; swordsDrawn: number; placeholder: boolean } {
+    let swordsDrawn = 0;
+    let placeholder = false;
+    for (const p of this.players.values()) {
+      swordsDrawn += p.swordCount;
+      if (!p.hasAtlas()) {
+        placeholder = true;
+      }
+    }
+    return { charsInView: this.players.size, swordsDrawn, placeholder };
+  }
+
   /** perfStats là cùng bộ số của overlay F3 nhưng ở dạng object (tools/browsertest đọc). */
   perfStats(): Record<string, number> {
     let swords = 0;

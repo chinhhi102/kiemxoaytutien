@@ -14,6 +14,7 @@ import (
 	"kiemxoay/server/internal/config"
 	"kiemxoay/server/internal/room"
 	"kiemxoay/server/internal/store"
+	"kiemxoay/server/internal/telemetry"
 	"kiemxoay/server/internal/world"
 )
 
@@ -26,6 +27,8 @@ type server struct {
 	debug   bool
 	names   *room.NameFilter
 	limiter *ipLimiter
+	// telemetry là nil khi chạy với -telemetry=false; mọi chỗ dùng phải kiểm nil.
+	telemetry *telemetry.Store
 }
 
 func (s *server) routes(assetsDir, clientDir string) *http.ServeMux {
@@ -35,6 +38,9 @@ func (s *server) routes(assetsDir, clientDir string) *http.ServeMux {
 	mux.HandleFunc("GET /api/rooms", s.handleRooms)
 	mux.HandleFunc("GET /api/map/{id}", s.handleMap)
 	mux.HandleFunc("GET /ws", s.handleWS)
+	// Tóm tắt phiên lúc đóng tab: sendBeacon chỉ gửi được POST, và lúc đó WebSocket đã đứt.
+	mux.HandleFunc("POST /telemetry/end", s.handleTelemetryEnd)
+	mux.HandleFunc("GET /admin/perf", s.handleAdminPerf)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", noListing(http.FileServer(http.Dir(assetsDir)))))
 	mux.Handle("GET /", spa(clientDir))
 	return mux

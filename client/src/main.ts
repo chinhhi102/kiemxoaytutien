@@ -7,14 +7,16 @@ import { Conn } from './net/conn';
 /** Chữ tên khu hiện bao lâu khi vào khu mới (spec §8.0). */
 const ZONE_BANNER_SECS = 1.5;
 
-import { PROTOCOL_VERSION } from './net/protocol';
+import { FLAG, PROTOCOL_VERSION } from './net/protocol';
 import { pendingRejoin, watchContextLoss } from './render/glrecover';
 import type { DeadMsg, GameMap, ServerMsg, Snapshot, Welcome } from './net/protocol';
 import { ClientWorld } from './net/state';
 import { assets } from './render/assets';
 import { loadFonts } from './render/fonts';
 import { GameScene } from './render/scene';
-import { cycleQuality, QUALITY_NAME } from './render/quality';
+import { cycleQuality, quality, QUALITY_NAME } from './render/quality';
+import { ringGeom } from './render/ringgeom';
+import type { Telemetry, TelemetryContext } from './telemetry';
 import { h, Screens } from './ui/dom';
 import { guestId, homeScreen, type Profile } from './ui/home';
 import { Hud } from './ui/hud';
@@ -65,6 +67,10 @@ class App {
   private joining = false;
   private early: Snapshot[] = [];
   private debug = false;
+  /** telemetry: null khi build không bật cờ TELEMETRY (bản release). */
+  private telemetry: Telemetry | null = null;
+  /** zoneIndex: khu đang đứng, lấy từ Welcome (spec §8.0). Telemetry chia nhóm theo nó. */
+  private zoneIndex = 0;
 
   constructor(private readonly cfg: GameConfig, private readonly overlay: HTMLElement, stage: HTMLElement) {
     this.screens = new Screens(overlay);
@@ -255,7 +261,14 @@ class App {
     }
     this.early = [];
     this.input.enabled = true;
+    this.zoneIndex = w.zn ?? 0;
     this.hud.setZone(w.znm ?? '', w.zn ?? 0);
+    // Bắt đầu thu số liệu từ lần vào trận đầu tiên; sang khu khác cũng gửi `welcome` nhưng
+    // `startTelemetry` tự bỏ qua lần hai, vì một PHIÊN là một lần chơi chứ không phải một khu.
+    void this.startTelemetry();
+    if (this.telemetry && changedZone) {
+      this.telemetry.event('zone_switch', String(w.zn ?? 0));
+    }
     if (changedZone) {
       // Chữ lớn mờ dần giữa màn hình khi vào khu mới (spec §8.0).
       this.hud.showBanner(STR.zoneEntered(w.znm ?? ''), ZONE_BANNER_SECS);
@@ -356,6 +369,85 @@ class App {
       const view = this.scene.viewSize();
       this.hud.minimap.render(me.x, me.y, me.f, view.w, view.h, performance.now() / 1000);
     }
+    // Telemetry ĐỨNG CUỐI vòng vẽ và chỉ ghi một con số: mọi thứ đắt hơn nó tự dồn về 4 Hz.
+    this.telemetry?.frame();
+  }
+
+  /**
+   * startTelemetry nạp module thu số liệu — chỉ khi build bật cờ `TELEMETRY=on`.
+   *
+   * `import()` động nằm sau một hằng số biên dịch: bản release có `__TELEMETRY__ === false`
+   * nên Rollup cắt hẳn nhánh này và KHÔNG đóng gói module (yêu cầu §1.6 — "module không
+   * được đóng gói vào"). Kiểm bằng `npm run check:telemetry-off`.
+   */
+  private async startTelemetry(): Promise<void> {
+    if (!__TELEMETRY__ || this.telemetry) {
+      return;
+    }
+    const { Telemetry } = await import('./telemetry');
+    const t = new Telemetry(
+      {
+        perfStats: () => this.scene.perfStats(),
+        net: () => ({ rttMs: this.conn.rttMs, kbPerSec: this.conn.kbPerSec, snapBytes: this.conn.lastSnapBytes }),
+        context: () => this.telemetryContext(),
+        send: (msg) => {
+          // `Conn.send` tự bỏ gói khi chưa nối; telemetry cần BIẾT điều đó để còn giữ mẫu
+          // lại gửi bù (§3), nên hỏi trạng thái trước rồi mới gửi.
+          if (!this.conn.isOpen) {
+            return false;
+          }
+          this.conn.send(msg);
+          return true;
+        },
+        canvasSize: () => {
+          const c = this.scene.app.canvas as HTMLCanvasElement;
+          return { w: c.width, h: c.height };
+        },
+      },
+      BUILD_ID,
+      PROTOCOL_VERSION,
+    );
+    t.start();
+    this.telemetry = t;
+    // Mất ngữ cảnh WebGL là ngưỡng cảnh báo §4.3 — chính là lỗi đội test gặp ngày 30/10.
+    const canvas = this.scene.app.canvas as HTMLCanvasElement;
+    canvas.addEventListener('webglcontextlost', () => t.event('webgl_context_lost'));
+    canvas.addEventListener('webglcontextrestored', () => t.event('webgl_context_restored'));
+  }
+
+  /** telemetryContext gom bối cảnh trận (§2.2 nhóm cuối). Chỉ ĐỌC trạng thái game. */
+  private telemetryContext(): TelemetryContext {
+    const me = this.world.me();
+    const draw = this.scene.drawStats();
+    // Số người Tiên giới trong khung nhìn: spec §4.1 mục 4 tách riêng nhóm này vì họ mang
+    // vòng kiếm nhiều lớp và hào quang — vài người Tiên giới cùng khung là tình huống nặng
+    // nhất mà game tạo ra, và cũng là chỗ đáng ngờ nhất khi ai đó báo tụt FPS.
+    let tien = 0;
+    const tienFrom = this.cfg.cultivation.realms.length; // cảnh giới >= số cảnh giới thường
+    for (const p of this.world.players.values()) {
+      const last = p.snaps[p.snaps.length - 1];
+      if (last && last.s.L >= tienFrom) {
+        tien++;
+      }
+    }
+    return {
+      zone: this.zoneIndex,
+      realm: me?.L ?? 0,
+      swords: me?.n ?? 0,
+      rings: me ? ringGeom(this.cfg, me.sc, me.n).rings : 0,
+      charsInView: draw.charsInView,
+      tienInView: tien,
+      swordsDrawn: draw.swordsDrawn,
+      // vfx: chưa đo được — lớp VFX không giữ bộ đếm số hiệu ứng đang chạy. Để 0 chứ không
+      // đoán: một con số bịa trong báo cáo hiệu năng còn tệ hơn một ô trống.
+      vfx: 0,
+      burning: ((me?.fl ?? 0) & FLAG.burning) !== 0,
+      zoning: this.joining,
+      placeholderNow: draw.placeholder,
+      respawn2s: this.world.takeRespawn2s(),
+      quality: QUALITY_NAME[quality()] ?? '',
+      qualityAuto: false,
+    };
   }
 }
 

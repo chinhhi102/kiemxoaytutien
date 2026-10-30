@@ -6,6 +6,7 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 
 	"kiemxoay/server/internal/game"
+	"kiemxoay/server/internal/telemetry"
 )
 
 // Client → server message types.
@@ -14,6 +15,9 @@ const (
 	TInput = "in"
 	TPing  = "ping"
 	TDebug = "dbg"
+	// TTelemetry: mẫu hiệu năng của người chơi thật (TELEMETRY_SPEC §3). Gói "lạnh" — server
+	// KHÔNG xử lý nó trong vòng tick, chỉ đẩy sang goroutine ghi.
+	TTelemetry = "tm"
 )
 
 // Envelope is decoded first to find the message type.
@@ -67,7 +71,21 @@ type ObstacleState struct {
 // Không có nó thì client mới gặp server cũ sẽ đọc rác rồi **đứng hình không báo gì** — đã
 // dính đúng một lần: client build 16:40 nói `mood` là chỉ số, server chạy từ 14:56 vẫn gửi
 // chuỗi, và người chơi chỉ thấy game treo.
+// Thêm hẳn một LOẠI gói mới (như `tm` telemetry) thì không phải đổi hình dạng gói cũ, nên
+// không tăng số: client cũ chỉ là không bao giờ gửi `tm`, còn server cũ gặp `tm` thì rơi vào
+// nhánh `default` và bỏ qua. Cả hai chiều đều an toàn, không ai đọc rác.
 const ProtocolVersion = 4
+
+// Telemetry chở thông tin phiên, mẫu 10 giây và sự kiện (TELEMETRY_SPEC §2, §3).
+//
+// Ba thứ đi chung một gói để tiết kiệm: mỗi 10s chỉ có đúng một gói rời client, và lần đầu
+// nó chở luôn thông tin phiên thay vì tốn thêm một gói riêng.
+type Telemetry struct {
+	T       string              `msgpack:"t"`
+	Session *telemetry.Session  `msgpack:"s,omitempty"`
+	Samples []*telemetry.Sample `msgpack:"m,omitempty"`
+	Events  []*telemetry.Event  `msgpack:"e,omitempty"`
+}
 
 type Welcome struct {
 	T         string          `msgpack:"t"`

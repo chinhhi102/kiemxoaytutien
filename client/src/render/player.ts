@@ -88,6 +88,11 @@ export class PlayerSprite {
    *
    * Trả về `false` nếu không đổi được (chưa có atlas) để nơi gọi biết mà thử lại sau.
    */
+  /** hasAtlas: đã có ảnh thật chưa, hay đang vẽ placeholder (ngân sách §4.3 là 0 khung). */
+  hasAtlas(): boolean {
+    return this.atlas !== null;
+  }
+
   setCharacter(char: string): boolean {
     if (char === this.char) {
       return true;
