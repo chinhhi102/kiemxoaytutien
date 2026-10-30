@@ -1,12 +1,12 @@
-run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_peak,pkt_max_kb,ping_p95_ms,fps_avg,fps_low1,draw_ms,draw_calls,sprites,tex_mb,placeholder_frames,respawn_per_min,zone_switch_cached_ms,zone_switch_cold_ms,deaths_per_bot_5min,notes
-0,,,"Mốc trước tối ưu",S1,11.45,19.89,,43.1,,38.3,,,,,,,,,,,,,"ItemsAdded dồn 1 gói"
-0b,,,"Mốc trước tối ưu - game thật 9 người",S4*,3.40,,,61.7,,3.0,,60,,1.0,245,2413,,,,,,,"đo trước chuẩn hóa"
-1,,,"v4.9 bản đồ - bản đầu",S4*,,,,,,,,36,,,611,,,,,,,,"Graphics riêng từng decal"
-2,,,"v4.9 bản đồ - bake chunk",S4*,,,,,,,,58,,0.9,118,,,,,,,,"draw call 611->118"
-3,,,"Sửa SegSegDist2",S5,,,,,,,,,,,,,,,,,,2.10,"304->84 lượt chết/5 phút"
-4,2026-10-30,f5720c0,"Mốc chuẩn - sau tối ưu mục 26+27",S1,1.56,3.33,5,8.6,,6.8,0.00,,,,,,,,,,,,"tick 11.45->1.56, gói 38.3->6.8"
-4,2026-10-30,f5720c0,"Mốc chuẩn - client mạng thường",S2,0.7,1.6,,19.5,45.5,2.5,342,7.6,3.6,2.5,0,4916,,,,,,,"FPS 10 tab headless không đại diện; draw call không đo được"
-4,2026-10-30,f5720c0,"Mốc chuẩn - client 4G yếu",S3,0.3,0.5,,7.7,13.6,0.6,22,,,,,,,,,,,,"chỉ tab thường; 0/5 tab lên được Đạo Tổ (mất ngữ cảnh WebGL)"
-4,2026-10-30,f5720c0,"Mốc chuẩn - nhịp chơi",S5,,,,,,,,,,,,,,,,,,4.70,"2.10->4.70 do luật v5.8 về sàn cảnh giới"
-5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (trước)",FLICKER,,,,,,,,,,,,,,462,76,,,,"38 lần respawn/30s; 462/596 khung có placeholder"
-5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (sau)",FLICKER,,,,,,,,,,,,,,0,0,,,,"0 respawn, 0 khung placeholder — đạt ngân sách §1"
+run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_peak,pkt_max_kb,ping_p95_ms,fps_avg,fps_low1,draw_ms,draw_calls,sprites,tex_mb,placeholder_frames,respawn_per_min,zone_switch_cached_ms,zone_switch_cold_ms,deaths_per_bot_5min,notes,n_sessions
+0,,,"Mốc trước tối ưu",S1,11.45,19.89,,43.1,,38.3,,,,,,,,,,,,,"ItemsAdded dồn 1 gói",
+0b,,,"Mốc trước tối ưu - game thật 9 người",S4*,3.40,,,61.7,,3.0,,60,,1.0,245,2413,,,,,,,"đo trước chuẩn hóa",
+1,,,"v4.9 bản đồ - bản đầu",S4*,,,,,,,,36,,,611,,,,,,,,"Graphics riêng từng decal",
+2,,,"v4.9 bản đồ - bake chunk",S4*,,,,,,,,58,,0.9,118,,,,,,,,"draw call 611->118",
+3,,,"Sửa SegSegDist2",S5,,,,,,,,,,,,,,,,,,2.10,"304->84 lượt chết/5 phút",
+4,2026-10-30,f5720c0,"Mốc chuẩn - sau tối ưu mục 26+27",S1,1.56,3.33,5,8.6,,6.8,0.00,,,,,,,,,,,,"tick 11.45->1.56, gói 38.3->6.8",
+4,2026-10-30,f5720c0,"Mốc chuẩn - client mạng thường",S2,0.7,1.6,,19.5,45.5,2.5,342,7.6,3.6,2.5,0,4916,,,,,,,"FPS 10 tab headless không đại diện; draw call không đo được",
+4,2026-10-30,f5720c0,"Mốc chuẩn - client 4G yếu",S3,0.3,0.5,,7.7,13.6,0.6,22,,,,,,,,,,,,"chỉ tab thường; 0/5 tab lên được Đạo Tổ (mất ngữ cảnh WebGL)",
+4,2026-10-30,f5720c0,"Mốc chuẩn - nhịp chơi",S5,,,,,,,,,,,,,,,,,,4.70,"2.10->4.70 do luật v5.8 về sàn cảnh giới",
+5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (trước)",FLICKER,,,,,,,,,,,,,,462,76,,,,"38 lần respawn/30s; 462/596 khung có placeholder",
+5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (sau)",FLICKER,,,,,,,,,,,,,,0,0,,,,"0 respawn, 0 khung placeholder — đạt ngân sách §1",

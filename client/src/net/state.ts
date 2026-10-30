@@ -66,6 +66,10 @@ export class ClientWorld {
   readonly obstacleHp = new Map<number, number>();
   /** goneAt: lần đầu một entity vắng mặt khỏi snapshot — xem `expire`. */
   private readonly goneAt = new Map<number, number>();
+  /** deletedAt: lúc một entity bị xoá hẳn, để nhận ra nó quay lại ngay sau đó (nhấp nháy). */
+  private readonly deletedAt = new Map<number, number>();
+  /** respawn2s: số lần nhấp nháy chưa báo cáo — xem takeRespawn2s. */
+  private respawn2s = 0;
   private offset: number | null = null;
   private pending: PendingInput[] = [];
   private seq = 0;
@@ -93,6 +97,7 @@ export class ClientWorld {
     this.players.clear();
     this.monsters.clear();
     this.goneAt.clear();
+    this.deletedAt.clear();
     this.items.clear();
     this.brokenObstacles.clear();
     this.obstacleHp.clear();
@@ -174,6 +179,17 @@ export class ClientWorld {
   private expire<T>(m: Map<number, T>, seen: Set<number>, now: number): void {
     for (const id of m.keys()) {
       if (seen.has(id)) {
+        // Quay lại sau khi đã bị xoá hẳn = một lần nhấp nháy người chơi NHÌN THẤY.
+        // Đếm ở đây để telemetry báo được con số đó từ máy thật (TELEMETRY_SPEC §2.2
+        // nhóm "Đồng bộ", ngân sách §4.3 là 0) — trước giờ chỉ đo được bằng flicker.mjs
+        // trên máy dev, nơi lỗi này gần như không bao giờ xảy ra.
+        const left = this.deletedAt.get(id);
+        if (left !== undefined) {
+          if (now - left < KEEP_GONE_SECS) {
+            this.respawn2s++;
+          }
+          this.deletedAt.delete(id);
+        }
         this.goneAt.delete(id);
         continue;
       }
@@ -183,8 +199,29 @@ export class ClientWorld {
       } else if (now - since >= KEEP_GONE_SECS) {
         m.delete(id);
         this.goneAt.delete(id);
+        this.deletedAt.set(id, now);
       }
     }
+    // Dọn `deletedAt`: entity rời đi quá `KEEP_GONE_SECS` mà chưa quay lại thì có quay lại
+    // cũng không còn tính là nhấp nháy nữa. Không dọn thì map này phình mãi — một trận dài
+    // đi qua hàng nghìn entity, và đó là rò rỉ bộ nhớ thật chứ không phải lý thuyết.
+    for (const [id, at] of this.deletedAt) {
+      if (now - at >= KEEP_GONE_SECS) {
+        this.deletedAt.delete(id);
+      }
+    }
+  }
+
+  /**
+   * takeRespawn2s trả về số lần nhấp nháy kể từ lần gọi trước, rồi đặt lại bộ đếm.
+   *
+   * "Lấy rồi xoá" chứ không phải "đọc": telemetry gộp theo cửa sổ 10 giây, nên mỗi lần
+   * nhấp nháy phải được đếm đúng MỘT lần vào đúng một cửa sổ.
+   */
+  takeRespawn2s(): number {
+    const n = this.respawn2s;
+    this.respawn2s = 0;
+    return n;
   }
 
   private updateMonsters(s: Snapshot): void {

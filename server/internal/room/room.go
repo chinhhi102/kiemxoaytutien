@@ -367,7 +367,11 @@ func (r *Room) stepZone(z *Zone, dt float64) {
 			float64(tCast.Sub(tDeaths).Microseconds())/1000, len(z.clients))
 	}
 	// Trung bình trượt để con số trên overlay không nhảy loạn (spec §13.6).
-	z.stepMs = z.stepMs*0.9 + float32(time.Since(stepStart).Microseconds())/1000*0.1
+	took := float64(time.Since(stepStart).Microseconds()) / 1000
+	z.stepMs = z.stepMs*0.9 + float32(took)*0.1
+	// Lưu nguyên giá trị thô vào cửa sổ 10 giây để telemetry tính được p95 — trung bình
+	// trượt ở trên đã làm phẳng mất đúng những tick chậm cần tìm (xem tickstats.go).
+	z.ticks.add(took)
 }
 
 func (r *Room) drainInbox() {

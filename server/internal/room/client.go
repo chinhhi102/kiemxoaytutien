@@ -3,6 +3,8 @@ package room
 import (
 	"math"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"kiemxoay/server/internal/game"
 	"kiemxoay/server/internal/netproto"
@@ -44,6 +46,15 @@ type Client struct {
 	// knownMonsters: máu LẦN CUỐI đã gửi cho client này, theo id quái. Có mặt trong map = đã
 	// gửi phần tĩnh (loại, máu tối đa, bán kính). Dùng để chỉ gửi máu khi nó đổi (spec mục 27).
 	knownMonsters map[uint32]int
+
+	// sentBytes: tổng byte đã gửi cho client này (telemetry §3). Atomic vì goroutine ghi
+	// telemetry đọc nó trong lúc goroutine phòng đang cộng vào.
+	sentBytes atomic.Int64
+	sentMark  atomic.Int64 // mốc của lần lấy mẫu trước (xem sentSince)
+
+	evMu     sync.Mutex
+	evWindow time.Time
+	evCount  int
 
 	inMu   sync.Mutex
 	seq    uint32
@@ -104,8 +115,61 @@ func (c *Client) setRoom(r *Room) {
 func (c *Client) send(v any) {
 	b, err := netproto.Encode(v)
 	if err == nil {
+		c.countOut(len(b))
 		c.Conn.Send(b)
 	}
+}
+
+// countOut cộng dồn số byte đã gửi cho client này (TELEMETRY_SPEC §3: "KB/s gửi mỗi client").
+//
+// Đếm ở ĐÂY chứ không ở tầng WebSocket vì đây là chỗ duy nhất biết gói thuộc về client nào
+// mà vẫn nằm trong `room`; tầng dưới chỉ thấy một đống byte không tên.
+func (c *Client) countOut(n int) { c.sentBytes.Add(int64(n)) }
+
+// SentBytes là tổng byte đã gửi cho client này từ lúc nối. Gọi được từ goroutine bất kỳ.
+func (c *Client) SentBytes() int64 { return c.sentBytes.Load() }
+
+// sentSince trả về số byte đã gửi KỂ TỪ lần gọi trước, rồi đặt lại mốc.
+func (c *Client) sentSince() int64 {
+	cur := c.sentBytes.Load()
+	return cur - c.sentMark.Swap(cur)
+}
+
+// AllowEvent là trần sự kiện telemetry của một kết nối (TELEMETRY_SPEC §2.3).
+//
+// Cần ở server chứ không chỉ ở client: sự kiện hay bắn nhất là `error`, và một tab dính lỗi
+// trong vòng vẽ bắn nó 60 lần/giây. Trần ở client không cứu được khi chính client là thứ
+// đang hỏng.
+func (c *Client) AllowEvent() bool {
+	now := time.Now()
+	c.evMu.Lock()
+	defer c.evMu.Unlock()
+	if now.Sub(c.evWindow) >= time.Minute {
+		c.evWindow, c.evCount = now, 0
+	}
+	c.evCount++
+	return c.evCount <= eventsPerMin
+}
+
+// eventsPerMin: trần sự kiện telemetry mỗi phút mỗi kết nối.
+const eventsPerMin = 40
+
+// ZoneKbpsOut là KB/s TRUNG BÌNH MỘT NGƯỜI mà server gửi ra ở khu này.
+//
+// Trung bình một người chứ không phải tổng: tổng chỉ nói khu đông hay vắng, còn con số cần
+// theo dõi là "một người tốn bao nhiêu băng thông", vì đó là thứ so được với ngân sách §1
+// và không đổi khi số người đổi.
+//
+// Chỉ gọi TRONG goroutine phòng (qua `Room.Do`): nó duyệt map client của khu.
+func (r *Room) ZoneKbpsOut(z *Zone, secs float64) float64 {
+	if secs <= 0 || len(z.clients) == 0 {
+		return 0
+	}
+	var total int64
+	for _, c := range z.clients {
+		total += c.sentSince()
+	}
+	return float64(total) / 1024 / secs / float64(len(z.clients))
 }
 
 // sendSnapshot gửi gói ảnh trạng thái: được phép bỏ bản cũ khi nghẽn, khác với `welcome` hay
@@ -115,6 +179,7 @@ func (c *Client) sendSnapshot(v any) {
 	if err != nil {
 		return
 	}
+	c.countOut(len(b))
 	if lossy, ok := c.Conn.(LossyConn); ok {
 		lossy.SendLossy(b)
 		return

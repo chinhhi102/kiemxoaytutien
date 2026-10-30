@@ -14,8 +14,20 @@
 | **S3** | `node tools/browsertest --scenario S2 --net slow4g` | Như S2 nhưng giả lập 4G yếu (100 ms, 1.6 Mbps / 750 Kbps). |
 | **S4** | Chơi tay 1 tab có giao diện, `?debug=true`, máy chuẩn (ghi cấu hình ở §4) | Đứng giữa trận đông nhất 60s, đọc F3. Đo FPS thật. |
 | **S5** | `go run ./cmd/sim --bots 40 --minutes 5 --seed 7` | Nhịp chơi (không phải hiệu năng): lượt chết, thời gian lên cảnh giới. |
+| **S6** | `go run ./cmd/perfreport --real --since 7d` | Số liệu **người chơi thật** trên server LAN `:9999` (TELEMETRY_SPEC). Ghi cả số phiên N; N < 5 thì tự đánh dấu "ít mẫu, tham khảo". |
 
 Mỗi kịch bản chạy **3 lần**, ghi trung vị. Cùng máy, cùng commit build, đóng ứng dụng nặng khác.
+
+**S6 là ngoại lệ và là kịch bản đáng tin nhất về trải nghiệm thật.** Nó không "chạy" lần nào
+cả — số liệu do chính người chơi gửi về trong lúc chơi, trên máy thật và mạng thật. Dòng S6
+được sinh **tự động 2 lần/ngày (12:00 và 23:30)** vào `docs/perf/real/`, luôn kèm build id.
+
+Vì sao nó đáng tin hơn S1–S5: cả năm kịch bản kia chạy trên máy dev, và máy dev có GPU rời.
+Ngày 30/10 đội test mất hẳn hình trên laptop GPU tích hợp vì một texture 1 GB mà **không một
+kịch bản nào trong S1–S5 phát hiện được** — máy dev nuốt được 1 GB nên mọi con số đều đẹp.
+S6 nhìn thấy đúng những máy đó.
+
+Đầu mỗi phiên làm việc: chép các dòng S6 mới trong `docs/perf/real/` vào bảng §3.
 
 ## 2. Bộ chỉ số (cột cố định)
 
@@ -203,5 +215,7 @@ Việc tiếp theo đề xuất: <1–3 việc, xếp theo lợi ích / công s�
 
 ## 8. Định dạng CSV (`docs/perf_log.csv`)
 ```
-run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_peak,pkt_max_kb,ping_p95_ms,fps_avg,fps_low1,draw_ms,draw_calls,sprites,tex_mb,placeholder_frames,respawn_per_min,zone_switch_cached_ms,zone_switch_cold_ms,deaths_per_bot_5min,notes
+run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_peak,pkt_max_kb,ping_p95_ms,fps_avg,fps_low1,draw_ms,draw_calls,sprites,tex_mb,placeholder_frames,respawn_per_min,zone_switch_cached_ms,zone_switch_cold_ms,deaths_per_bot_5min,notes,n_sessions
 ```
+
+`n_sessions` chỉ có nghĩa với S6 (số phiên người thật gộp vào dòng đó); các kịch bản khác để TRỐNG, không điền 0 — "không áp dụng" và "0 phiên" là hai chuyện khác nhau.

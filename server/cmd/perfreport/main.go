@@ -83,7 +83,22 @@ func main() {
 	seed := flag.Int("seed", 7, "seed của kịch bản chuẩn")
 	label := flag.String("label", "", "tên lượt, điền vào cột 'Lượt / thay đổi'")
 	num := flag.String("n", "?", "số thứ tự lượt trong bảng §3")
+	// Chế độ S6: KHÔNG chạy kịch bản nào cả, chỉ đọc số liệu người chơi thật đã thu
+	// (TELEMETRY_SPEC §4.1). Đây là số đáng tin nhất về trải nghiệm thật, vì nó đến từ máy
+	// thật và mạng thật chứ không phải bot trên máy dev.
+	real := flag.Bool("real", false, "báo cáo số liệu NGƯỜI THẬT (S6) thay vì chạy S1")
+	since := flag.String("since", "24h", "khoảng thời gian cho --real: 1h, 24h, 7d")
+	session := flag.String("session", "", "chỉ một phiên cho --real")
+	dbPath := flag.String("db", "", "DB telemetry (mặc định: server/data/telemetry.db)")
 	flag.Parse()
+
+	if *real {
+		if err := reportReal(*dbPath, *since, *session); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	var tickAvg, tickP95, pkt, kbps, ping, cpu []float64
 	for i := 0; i < *runs; i++ {

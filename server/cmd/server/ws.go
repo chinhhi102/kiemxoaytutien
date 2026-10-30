@@ -11,6 +11,7 @@ import (
 
 	"kiemxoay/server/internal/netproto"
 	"kiemxoay/server/internal/room"
+	"kiemxoay/server/internal/telemetry"
 )
 
 const (
@@ -71,7 +72,9 @@ func (s *server) handleWS(w http.ResponseWriter, r *http.Request) {
 	go writeLoop(ctx, ws, conn.out, cancel)
 	// Debug bật theo từng người: server chỉ cho phép, client phải tự xin bằng ?debug=true.
 	client := room.NewClient(conn, false)
-	s.readLoop(ctx, ws, client)
+	// Băm IP ngay tại đây, không giữ IP thô ở bất cứ đâu khác (TELEMETRY_SPEC §1.3): nó chỉ
+	// dùng để biết "hai phiên này cùng một mạng", không để truy ra ai.
+	s.readLoop(ctx, ws, client, telemetry.Hash(ip))
 	if rm := client.Room(); rm != nil {
 		rm.RemoveClient(client)
 	}
@@ -96,7 +99,7 @@ func writeLoop(ctx context.Context, ws *websocket.Conn, out <-chan []byte, cance
 }
 
 // readLoop decodes client messages and enforces the per-connection rate limit.
-func (s *server) readLoop(ctx context.Context, ws *websocket.Conn, c *room.Client) {
+func (s *server) readLoop(ctx context.Context, ws *websocket.Conn, c *room.Client, ipHash string) {
 	windowStart, count := time.Now(), 0
 	for {
 		_, data, err := ws.Read(ctx)
@@ -113,11 +116,11 @@ func (s *server) readLoop(ctx context.Context, ws *websocket.Conn, c *room.Clien
 		if netproto.Decode(data, &env) != nil {
 			continue
 		}
-		s.dispatch(c, env.T, data)
+		s.dispatch(c, env.T, data, ipHash)
 	}
 }
 
-func (s *server) dispatch(c *room.Client, t string, data []byte) {
+func (s *server) dispatch(c *room.Client, t string, data []byte, ipHash string) {
 	switch t {
 	case netproto.TInput:
 		var in netproto.Input
@@ -133,6 +136,8 @@ func (s *server) dispatch(c *room.Client, t string, data []byte) {
 				c.Conn.Send(b)
 			}
 		}
+	case netproto.TTelemetry:
+		s.handleTelemetry(c, ipHash, data)
 	case netproto.TDebug:
 		var d netproto.Debug
 		// Bỏ lệnh test trong im lặng từng làm hai lượt đo 10 tab ra bảng số sai mà không ai

@@ -38,6 +38,11 @@ func main() {
 	// Hồ sơ CPU cho công cụ đo: cmd/loadtest chạy trong ống nghiệm, còn đây là server thật
 	// với bot, bản đồ thật và client thật — hai nơi cho ra hình ảnh CPU khác hẳn nhau.
 	cpuProf := flag.String("cpuprofile", "", "ghi hồ sơ CPU ra file này cho tới khi tắt server")
+	// Telemetry người chơi thật (TELEMETRY_SPEC). Bật mặc định vì `:9999` là server của đội
+	// test; bản release chạy với `-telemetry=false` và client release không đóng gói module.
+	telemetryOn := flag.Bool("telemetry", true, "thu số liệu hiệu năng của người chơi thật")
+	telemetryDB := flag.String("telemetry-db", "", "SQLite telemetry (mặc định: server/data/telemetry.db)")
+	buildID := flag.String("build", "", "mã build ghi kèm mọi số liệu (mặc định: thời điểm khởi động)")
 	flag.Parse()
 
 	if *cpuProf != "" {
@@ -69,8 +74,16 @@ func main() {
 	}
 	mgr := room.NewManager(cfg, maps, st)
 	mgr.AllowDebug = *debug // người chơi vẫn phải tự mở bằng ?debug=true mới thấy bảng
+	tel := startTelemetry(telemetryPath(*telemetryDB), buildIDOrNow(*buildID), *telemetryOn)
 	srv := &server{cfg: cfg, rawCfg: raw, mgr: mgr, store: st, maps: maps, debug: *debug,
-		names: room.LoadNameFilter(cfg, filepath.Join(filepath.Dir(*cfgPath), "bad_words.txt")), limiter: newIPLimiter(cfg.Net.MaxConnsPerIP)}
+		names: room.LoadNameFilter(cfg, filepath.Join(filepath.Dir(*cfgPath), "bad_words.txt")), limiter: newIPLimiter(cfg.Net.MaxConnsPerIP),
+		telemetry: tel}
+	stopSampler := make(chan struct{})
+	if tel != nil {
+		defer tel.Close()
+		go srv.runServerSampler(stopSampler)
+		go srv.runRollupScheduler(stopSampler)
+	}
 	mux := srv.routes(*assetsDir, *clientDir)
 	log.Printf("Kiếm Xoay server listening on %s (debug=%v)", *addr, *debug)
 	httpSrv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
@@ -84,11 +97,42 @@ func main() {
 			pprof.StopCPUProfile()
 			log.Printf("đã ghi hồ sơ CPU vào %s", *cpuProf)
 		}
+		close(stopSampler)
+		if tel != nil {
+			// Đóng telemetry TRƯỚC khi tắt HTTP: Close ghi nốt hàng đợi xuống đĩa, nếu không
+			// thì 5 giây số liệu cuối cùng — thường là 5 giây thú vị nhất — mất sạch.
+			if err := tel.Close(); err != nil {
+				log.Printf("telemetry: đóng: %v", err)
+			}
+		}
 		_ = httpSrv.Close()
 	}()
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+}
+
+// telemetryPath mặc định đặt DB cạnh leaderboard, nhưng là FILE RIÊNG (§3): telemetry ghi
+// liên tục và bị dọn theo hạn 30 ngày, không được đụng vào dữ liệu bảng xếp hạng.
+func telemetryPath(path string) string {
+	if path != "" {
+		return path
+	}
+	repo := filepath.Dir(filepath.Dir(config.FindRepoFile("config/game.json")))
+	dir := filepath.Join(repo, "server", "data")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Fatal(err)
+	}
+	return filepath.Join(dir, "telemetry.db")
+}
+
+// buildIDOrNow: mã build ghi kèm mọi dòng số liệu (§5), để so "trước/sau một build" được.
+// Không truyền `-build` thì lấy thời điểm khởi động — vẫn phân biệt được hai lần deploy.
+func buildIDOrNow(id string) string {
+	if id != "" {
+		return id
+	}
+	return time.Now().Format("2006-01-02_1504")
 }
 
 func openStore(path string, cfg *config.Config) *store.Store {
