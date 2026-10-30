@@ -136,6 +136,14 @@ func (s *server) dispatch(c *room.Client, t string, data []byte, ipHash string) 
 				c.Conn.Send(b)
 			}
 		}
+	case netproto.TDescRequest:
+		// NETCODE_SPEC §5 Hiển thị mục 2: client thiếu mô tả entity thì HỎI, thay vì vẽ
+		// placeholder. Không cần ở trong phòng mới hỏi được — chỉ ghi nhận, snapshot kế
+		// tiếp của chính client đó sẽ chở mô tả.
+		var d netproto.DescRequest
+		if netproto.Decode(data, &d) == nil && len(d.IDs) > 0 {
+			c.ForgetDesc(d.IDs)
+		}
 	case netproto.TTelemetry:
 		s.handleTelemetry(c, ipHash, data)
 	case netproto.TDebug:

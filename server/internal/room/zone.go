@@ -33,7 +33,7 @@ type Zone struct {
 	// itemBuf dùng lại giữa các lần dựng snapshot — spec §13.4 cấm cấp phát mỗi tick.
 	itemBuf []itemCand
 	// stepMs: thời gian xử lý một tick của riêng khu này, gửi kèm snapshot cho overlay F3.
-	stepMs  float32
+	stepMs float32
 	// ticks: cửa sổ 10 giây thời gian tick thô, cho telemetry tính p95 (tickstats.go).
 	ticks   tickStats
 	tick    uint32

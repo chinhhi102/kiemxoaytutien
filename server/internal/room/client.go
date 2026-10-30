@@ -52,6 +52,10 @@ type Client struct {
 	sentBytes atomic.Int64
 	sentMark  atomic.Int64 // mốc của lần lấy mẫu trước (xem sentSince)
 
+	// descAsk: entity mà client xin gửi lại mô tả (xem ForgetDesc). Khoá bằng `inMu` vì nó
+	// được ghi từ goroutine đọc WebSocket và đọc từ goroutine phòng.
+	descAsk map[uint32]bool
+
 	evMu     sync.Mutex
 	evWindow time.Time
 	evCount  int
@@ -133,6 +137,42 @@ func (c *Client) SentBytes() int64 { return c.sentBytes.Load() }
 func (c *Client) sentSince() int64 {
 	cur := c.sentBytes.Load()
 	return cur - c.sentMark.Swap(cur)
+}
+
+// ForgetDesc quên rằng đã gửi mô tả của những entity này, để snapshot sau gửi lại
+// (NETCODE_SPEC §5 Hiển thị mục 2).
+//
+// Chỉ quên entity client HỎI, không quên sạch bảng: quên sạch thì gói kế tiếp phải chở tên
+// và nhân vật của toàn bộ người trong tầm nhìn — đúng thứ `knownPlayers` sinh ra để tránh.
+//
+// Có trần: một client hỏng (hoặc cố tình) có thể bắn `dreq` liên tục để ép server gửi lại
+// mô tả mọi người mỗi gói. Trần làm việc đó thành vô ích.
+func (c *Client) ForgetDesc(ids []uint32) {
+	const maxPerRequest = 32
+	c.inMu.Lock()
+	defer c.inMu.Unlock()
+	if c.descAsk == nil {
+		c.descAsk = map[uint32]bool{}
+	}
+	for i, id := range ids {
+		if i >= maxPerRequest {
+			break
+		}
+		c.descAsk[id] = true
+	}
+}
+
+// takeDescAsks lấy danh sách entity cần gửi lại mô tả, rồi xoá.
+// Gọi TRONG goroutine phòng (lúc dựng snapshot).
+func (c *Client) takeDescAsks() map[uint32]bool {
+	c.inMu.Lock()
+	defer c.inMu.Unlock()
+	if len(c.descAsk) == 0 {
+		return nil
+	}
+	out := c.descAsk
+	c.descAsk = nil
+	return out
 }
 
 // AllowEvent là trần sự kiện telemetry của một kết nối (TELEMETRY_SPEC §2.3).

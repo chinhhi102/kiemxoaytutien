@@ -269,11 +269,11 @@ func itemJobs() []Job {
 	}
 	jobs := []Job{
 		sprite("item_sword", "items/sword.png", 128, "A glossy transparent soap bubble containing a small glowing sword, shiny highlight."),
-		// Bó Kiếm: vật phẩm DUY NHẤT còn vẽ tay bằng Graphics (ba lưỡi chéo buộc dây đỏ).
-		// ART_PROMPTS chưa có job cho nó — thêm ở đây, chờ chủ dự án chốt đưa vào spec
-		// (đã ghi vào docs/QUESTIONS.md). Cùng cỡ 128 như item_sword vì vẽ ra cùng kích thước.
+		// Bó Kiếm — chủ dự án duyệt 30/10, prompt lấy NGUYÊN VĂN từ ART_PROMPTS §8 bảng
+		// "Vật phẩm". Năm thanh kiếm (không phải ba), xoè nhẹ, buộc ruy băng đỏ, hào quang
+		// vàng — để phân biệt với bong bóng kiếm đơn.
 		sprite("item_bundle", "items/bundle.png", 128,
-			"A bundle of three small glowing swords crossed together and tied with a red cloth band, inside a glossy transparent soap bubble, shiny highlight."),
+			"A glossy transparent soap bubble containing a bundle of five small swords tied together with a red ribbon, swords fanned out slightly, golden glow, shiny highlight."),
 	}
 	for _, c := range []struct{ id, color string }{{"orb_small", "green"}, {"orb_medium", "blue"}, {"orb_large", "gold"}} {
 		jobs = append(jobs, sprite("item_"+c.id, "items/"+c.id+".png", 128, "A glowing "+c.color+" spirit orb gem, sparkly, round."))

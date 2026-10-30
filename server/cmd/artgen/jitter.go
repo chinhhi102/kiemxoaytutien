@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -119,15 +120,54 @@ type AnimScore struct {
 	// Outlier / OutlierFrame: frame lạc lõng nhất và điểm của nó (xem outlierRatio).
 	// Đây là con số dùng để quyết định SINH LẠI frame nào; `Avg`/`Worst` chỉ nói animation
 	// nào đáng xem trước.
-	Outlier      float64     `json:"outlier"`
-	OutlierFrame string      `json:"outlier_frame"`
-	Pairs        []PairScore `json:"pairs"`
+	Outlier      float64 `json:"outlier"`
+	OutlierFrame string  `json:"outlier_frame"`
+	// Excepted: chủ dự án đã duyệt là giật CÓ CHỦ ĐÍCH (assets/jitter_exceptions.json).
+	// Vẫn có điểm đầy đủ, chỉ không tính vào số "đỏ" — để nếu art đổi khiến điểm vọt lên thì
+	// vẫn nhìn thấy, thay vì bị giấu đi vĩnh viễn.
+	Excepted bool        `json:"excepted,omitempty"`
+	Reason   string      `json:"exception_reason,omitempty"`
+	Pairs    []PairScore `json:"pairs"`
 }
 
 // JitterReport là toàn bộ kết quả, ghi ra assets/_raw/jitter.json.
 type JitterReport struct {
 	Threshold float64     `json:"threshold"`
 	Anims     []AnimScore `json:"anims"`
+}
+
+// Exception là một animation được chủ dự án duyệt là "giật có chủ đích".
+type Exception struct {
+	Char       string `json:"char"`
+	Anim       string `json:"anim"`
+	Reason     string `json:"reason"`
+	ApprovedBy string `json:"approved_by"`
+	Date       string `json:"date"`
+}
+
+// loadExceptions đọc assets/jitter_exceptions.json.
+//
+// Không có file, file hỏng, hay danh sách rỗng đều KHÔNG phải lỗi — chỉ là chưa ai duyệt
+// ngoại lệ nào. Nhưng nếu file có mà đọc hỏng thì phải NÓI RA: im lặng coi như rỗng nghĩa là
+// một anim đã được duyệt bỗng lại báo đỏ, và không ai hiểu vì sao.
+func loadExceptions(assets string) map[string]Exception {
+	out := map[string]Exception{}
+	path := filepath.Join(assets, "jitter_exceptions.json")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return out
+	}
+	var doc struct {
+		Exceptions []Exception `json:"exceptions"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		log.Printf("CẢNH BÁO: %s hỏng (%v) — coi như không có ngoại lệ nào", path, err)
+		return out
+	}
+	for _, e := range doc.Exceptions {
+		out[e.Char+"/"+e.Anim] = e
+	}
+	return out
 }
 
 func clamp100(v float64) float64 {
@@ -221,6 +261,7 @@ func buildJitterIn(assets, sub string, write bool) (*JitterReport, error) {
 	dirs, _ := filepath.Glob(filepath.Join(assets, "characters", "*", sub))
 	more, _ := filepath.Glob(filepath.Join(assets, "monsters", "*", sub))
 	rep := &JitterReport{Threshold: jitterRed}
+	exc := loadExceptions(assets)
 	for _, dir := range append(dirs, more...) {
 		char := filepath.Base(filepath.Dir(dir))
 		files, _ := filepath.Glob(filepath.Join(dir, "*.png"))
@@ -262,6 +303,9 @@ func buildJitterIn(assets, sub string, write bool) (*JitterReport, error) {
 				sc.Avg = sum / float64(len(sc.Pairs))
 			}
 			sc.OutlierFrame, sc.Outlier = worstOutlier(sc.Pairs)
+			if e, ok := exc[char+"/"+anim]; ok {
+				sc.Excepted, sc.Reason = true, e.Reason
+			}
 			rep.Anims = append(rep.Anims, sc)
 		}
 	}
@@ -360,13 +404,13 @@ func printJitter(rep *JitterReport, limit int) {
 
 	redLoop := 0
 	for _, a := range loops {
-		if a.Avg >= rep.Threshold {
+		if a.Avg >= rep.Threshold && !a.Excepted {
 			redLoop++
 		}
 	}
 	redOnce := 0
 	for _, a := range once {
-		if a.Outlier >= rep.Threshold {
+		if a.Outlier >= rep.Threshold && !a.Excepted {
 			redOnce++
 		}
 	}
@@ -390,6 +434,11 @@ func printGroup(title string, rows []AnimScore, limit int, byOutlier bool, thres
 		mark := " "
 		if key >= threshold {
 			mark = "!"
+		}
+		if a.Excepted {
+			// Vẫn in điểm, chỉ đổi dấu: "đã duyệt" khác hẳn "đạt ngưỡng", và lẫn hai thứ
+			// đó là mất luôn khả năng thấy art xuống cấp về sau.
+			mark = "~"
 		}
 		worst := PairScore{}
 		for _, p := range a.Pairs {

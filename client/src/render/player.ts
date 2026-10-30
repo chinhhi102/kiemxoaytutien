@@ -64,6 +64,8 @@ export class PlayerSprite {
   /** ghost: lớp animation cũ mờ dần trong lúc crossfade. */
   private ghost: AnimatedSprite | null = null;
   private animFps = 12;
+  /** usingFallback: đang vẽ bằng nhân vật dự phòng vì thiếu atlas của nhân vật thật. */
+  private usingFallback = false;
   private lastPos = { x: 0, y: 0 };
   private lastFace = 0;
   private lastAt = 0;
@@ -72,12 +74,14 @@ export class PlayerSprite {
 
   constructor(
     private readonly cfg: GameConfig,
-    readonly id: number,
+    public id: number,
     name: string,
     public char: string,
     private readonly isMe: boolean,
   ) {
-    this.atlas = assets.atlas(`characters/${char}`);
+    const got = assets.charAtlas(char);
+    this.atlas = got?.set ?? null;
+    this.usingFallback = got?.fallback ?? false;
     this.swordRing = new SwordRing(cfg);
     this.plate = new Nameplate(cfg, name, isMe, Input.isTouchDevice());
     // Hào quang Tiên giới KHÔNG còn nằm ở đây: nó chuyển sang `vfxLayer` dùng chung để ăn
@@ -156,13 +160,17 @@ export class PlayerSprite {
   }
 
   setCharacter(char: string): boolean {
-    if (char === this.char) {
+    // `usingFallback` cũng phải xét: nếu đang vẽ bằng nhân vật dự phòng thì dù tên nhân vật
+    // không đổi vẫn phải thử lại — atlas thật có thể vừa tải xong.
+    if (char === this.char && !this.usingFallback) {
       return true;
     }
-    const next = assets.atlas(`characters/${char}`);
+    const got = assets.charAtlas(char);
+    const next = got?.set ?? null;
     if (!next) {
       return false;
     }
+    this.usingFallback = got?.fallback ?? false;
     this.char = char;
     this.atlas = next;
     this.mood = ''; // ép `updateBody` dựng lại thân theo atlas mới
@@ -492,6 +500,44 @@ export class PlayerSprite {
     }
     this.bubble.scale.set(1 / zoom);
     this.bubble.position.set(r * 0.8, -r * (CHAR_HEIGHT_PER_R - FEET_BELOW_CENTER) - 34 / zoom);
+  }
+
+  /**
+   * setLeaveFade đặt độ mờ lúc entity đang rời khung hình (1 = rõ, 0 = mất hẳn).
+   * Spec §5 Hiển thị mục 4: mờ dần ra 150 ms rồi mới về pool.
+   */
+  setLeaveFade(k: number): void {
+    this.root.alpha = Math.max(0, Math.min(1, k));
+  }
+
+  /** park cất view vào pool: ẩn đi nhưng GIỮ NGUYÊN texture (spec §5 "View Pool"). */
+  park(): void {
+    this.root.visible = false;
+    this.root.alpha = 1;
+    this.ring.visible = false;
+  }
+
+  /**
+   * reuse đặt lại một view lấy từ pool. Trả về false nếu không dùng lại được.
+   *
+   * `isMe` khác thì từ chối: bảng tên của chính mình có màu chữ và dấu riêng, đổi tại chỗ
+   * thì phải sửa nhiều thứ nhỏ và quên một cái là lỗi khó thấy. Trường hợp này cực hiếm
+   * (view của chính mình gần như không bao giờ rời khung nhìn) nên dựng mới là đáng.
+   */
+  reuse(id: number, name: string, char: string, isMe: boolean): boolean {
+    if (isMe !== this.isMe) {
+      return false;
+    }
+    if (!this.setCharacter(char)) {
+      return false;
+    }
+    this.id = id;
+    this.plate.rename(name);
+    this.root.visible = true;
+    this.root.alpha = 1;
+    this.ring.visible = true;
+    this.bornAt = 0; // mờ dần VÀO lại từ đầu, như một entity mới xuất hiện
+    return true;
   }
 
   destroy(): void {

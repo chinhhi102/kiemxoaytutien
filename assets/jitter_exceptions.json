@@ -1,0 +1,13 @@
+{
+  "_doc": [
+    "Animation được chủ dự án DUYỆT là giật có chủ đích (ANSWERS 30/10).",
+    "Anim có trong danh sách này KHÔNG tính là đỏ, nhưng VẪN hiện điểm — để biết nó đang ở",
+    "mức nào, và để nếu một ngày art đổi khiến điểm vọt lên thì còn nhìn thấy.",
+    "",
+    "Chỉ thêm vào đây khi đã nhìn bằng mắt (trong game: ?debug=true → J → [ ]), và phải ghi",
+    "ai duyệt. Dùng nó để 'làm cho bảng đẹp' là tự bịt mắt mình.",
+    "",
+    "Mỗi mục: char, anim, reason, approved_by, date."
+  ],
+  "exceptions": []
+}

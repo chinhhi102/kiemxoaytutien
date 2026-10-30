@@ -1,5 +1,6 @@
 import { Application, Container } from 'pixi.js';
 import { AnimViewer } from './animviewer';
+import { FADE_OUT_SECS, ViewPool } from './viewpool';
 import { BobaOverlay } from './boba';
 
 import { sound } from '../audio/sound';
@@ -159,6 +160,10 @@ export class GameScene {
 
   clear(): void {
     this.camera.removeChildren();
+    // Pool phải dọn theo: view trong pool thuộc về khu CŨ, giữ lại là giữ texture của một
+    // bản đồ không còn dùng — đúng kiểu rò rỉ bộ nhớ mang tên "tối ưu".
+    this.pool.clear();
+    this.leaving.clear();
     for (const p of this.players.values()) {
       p.destroy();
     }
@@ -285,7 +290,11 @@ export class GameScene {
         sp.setCharacter(f.view.char);
       }
       if (!sp) {
-        sp = new PlayerSprite(this.cfg, f.view.id, f.view.name, f.view.char, f.view.id === this.world?.myId);
+        // Lấy từ pool trước khi dựng mới: dựng một `PlayerSprite` là tạo cả chục đối tượng
+        // PixiJS (thân, vòng kiếm, bảng tên, bóng, hào quang). Làm việc đó giữa trận, mỗi
+        // lần có người vào khung hình, là nguồn giật rác bộ nhớ — §5 nói rõ "không tạo/hủy
+        // object trong lúc chơi".
+        sp = this.pool.take(this.cfg, f.view.id, f.view.name, f.view.char, f.view.id === this.world?.myId);
         this.players.set(f.view.id, sp);
         this.entities.addChild(sp.root);
         this.rings.addChild(sp.ring);
@@ -299,11 +308,27 @@ export class GameScene {
       this.syncAura(f, now);
       this.moodChatter(f.view.id, moodName(f.s.md), now);
     }
+    // Rời khung hình: MỜ DẦN RA 150 ms rồi mới về pool, không biến mất đột ngột
+    // (NETCODE_SPEC §5 Hiển thị mục 4). Huỷ hẳn sprite cũng bị bỏ: view vào pool, giữ
+    // texture, lần sau lấy ra dùng lại (§5 "View Pool").
     for (const [id, sp] of this.players) {
-      if (!seen.has(id)) {
-        sp.destroy();
-        this.players.delete(id);
+      if (seen.has(id)) {
+        this.leaving.delete(id);
+        continue;
       }
+      const since = this.leaving.get(id);
+      if (since === undefined) {
+        this.leaving.set(id, now);
+        continue;
+      }
+      const t = (now - since) / FADE_OUT_SECS;
+      if (t < 1) {
+        sp.setLeaveFade(1 - t);
+        continue;
+      }
+      this.leaving.delete(id);
+      this.players.delete(id);
+      this.pool.put(sp);
     }
     for (const [id, a] of this.auras) {
       if (!seen.has(id)) {
@@ -418,7 +443,7 @@ export class GameScene {
         }
         continue;
       }
-      sp.update(now, absorbable(sp.it.k, meBanksTienKhi));
+      sp.update(now, absorbable(sp.it.k, meBanksTienKhi), this.zoom);
     }
     this.syncOrbs(items, now, meBanksTienKhi);
   }
@@ -526,6 +551,10 @@ export class GameScene {
 
   /** animInfoOn: giữ trạng thái để nhân vật MỚI xuất hiện cũng bật sẵn, không phải bấm lại. */
   private animInfoOn = false;
+  /** leaving[id] = lúc entity bắt đầu mờ ra. Xem vòng dọn ở cuối `drawPlayers`. */
+  private readonly leaving = new Map<number, number>();
+  /** pool: view đã rời khung hình, giữ nguyên texture để dùng lại (§5 "View Pool"). */
+  private readonly pool = new ViewPool();
   /** animViewer: khung xem từng animation của chế độ `J` (phím `[` / `]`). */
   readonly animViewer = new AnimViewer();
 

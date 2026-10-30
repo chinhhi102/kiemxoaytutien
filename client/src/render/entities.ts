@@ -1,4 +1,4 @@
-import { AnimatedSprite, Container, Graphics, GraphicsContext, Sprite, type Texture } from 'pixi.js';
+import { AnimatedSprite, Container, Graphics, GraphicsContext, Sprite, Text, type Texture } from 'pixi.js';
 
 import type { ItemState, MonsterState } from '../net/protocol';
 import { assets } from './assets';
@@ -10,6 +10,14 @@ const ITEM_SIZE_PER_R = 2.6;
 export const ORB_COLORS = { small: 0x3ee6ff, medium: 0x00b4ff, large: 0xffd23f };
 const GLOW_SCALE = 1.9; // halo radius relative to the item
 const BUNDLE_COLOR = 0xe0e6ee;
+/**
+ * BUNDLE_SCALE: Bó Kiếm vẽ to hơn bong bóng kiếm đơn 20% (ART_PROMPTS §8, chủ dự án chốt
+ * 30/10). Hai thứ dùng cùng một kiểu bong bóng nên nếu cùng cỡ thì lúc chạy ngang qua không
+ * phân biệt được cái nào cho 1 kiếm, cái nào cho cả bó.
+ */
+const BUNDLE_SCALE = 1.2;
+/** COUNT_PX: chiều cao nhãn số kiếm trên MÀN HÌNH, pixel — không đổi theo thu phóng. */
+const COUNT_PX = 15;
 
 // Shared drawing contexts: thousands of orbs reuse a handful of geometries.
 const contexts = new Map<string, GraphicsContext>();
@@ -122,12 +130,13 @@ function itemTexture(it: ItemState): Texture | null {
     const size = (it.v ?? 0) >= 60 ? 'large' : (it.v ?? 0) >= 20 ? 'medium' : 'small';
     return assets.texture(`items/orb_${size}.png`);
   }
-  if (it.k === 'sword' || it.k === 'bundle') {
-    // Cả hai KHÔNG đi qua hàm này:
-    //   - `sword` có nhánh riêng trong `drawItem` (dùng `items/sword.png`).
-    //   - `bundle` vẽ bằng Graphics trong `placeholder()` — ART_PROMPTS chưa có job cho nó.
-    // Chú thích cũ ở đây nói "sword art is drawn inside the placeholder below" là SAI:
-    // placeholder của kiếm chỉ vẽ vòng tròn trắng + thanh nâu, không dán ảnh nào.
+  if (it.k === 'bundle') {
+    return assets.texture('items/bundle.png');
+  }
+  if (it.k === 'sword') {
+    // `sword` có nhánh riêng trong constructor (dùng `items/sword.png`). Chú thích cũ ở đây
+    // nói "sword art is drawn inside the placeholder below" là SAI: placeholder của kiếm chỉ
+    // vẽ vòng tròn trắng + thanh nâu, không dán ảnh nào.
     return null;
   }
   if (it.k === 'chest') {
@@ -153,10 +162,32 @@ export function orbSize(v: number): 'small' | 'medium' | 'large' {
   return v >= 60 ? 'large' : v >= 20 ? 'medium' : 'small';
 }
 
+/**
+ * bundleCount vẽ số kiếm lên bong bóng Bó Kiếm (ART_PROMPTS §8).
+ *
+ * Gắn vào `root` (đơn vị THẾ GIỚI), KHÔNG gắn làm con của sprite ảnh. Sprite đặt kích thước
+ * bằng `width`/`height`, mà PixiJS cài hai thứ đó bằng cách đổi `scale` — nên chữ nằm trong
+ * nó bị nhân tỉ lệ LẦN THỨ HAI. Lần đầu tôi làm vậy và con số ra cao đúng 1 pixel.
+ */
+function bundleCount(n: number, r: number): Text {
+  const t = new Text({
+    text: String(n),
+    style: { fontSize: 44, fontWeight: '900', fill: 0xffffff, stroke: { color: 0x000000, width: 7 } },
+  });
+  t.anchor.set(0.5);
+  // Tỉ lệ thật do `update()` đặt lại mỗi khung theo thu phóng; đây chỉ là giá trị khởi đầu
+  // để khung hình đầu tiên không nhảy cỡ.
+  t.scale.set(COUNT_PX / 44);
+  t.y = r * 0.15;
+  return t;
+}
+
 /** ItemSprite: bobbing bubble/orb/chest with a shadow and halo. */
 export class ItemSprite {
   readonly root = new Container();
   private readonly phase = Math.random() * Math.PI * 2;
+  /** count: nhãn số kiếm của Bó Kiếm (null với mọi loại khác). */
+  private count: Text | null = null;
 
   constructor(readonly it: ItemState, itemR: number) {
     const r = it.k === 'orb' ? orbRadius(it.v ?? 0)
@@ -175,7 +206,8 @@ export class ItemSprite {
     } else if (tex) {
       const sp = new Sprite(tex);
       sp.anchor.set(0.5);
-      sp.width = sp.height = r * ITEM_SIZE_PER_R;
+      const k = it.k === 'bundle' ? BUNDLE_SCALE : 1;
+      sp.width = sp.height = r * ITEM_SIZE_PER_R * k;
       node = sp;
     } else if (it.k === 'sword' && assets.texture('items/sword.png')) {
       const sp = new Sprite(assets.texture('items/sword.png') as Texture);
@@ -189,6 +221,12 @@ export class ItemSprite {
       : it.k === 'tien_khi' ? 0xffd60a
       : it.k === 'chest' ? 0xffd23f : 0xffffff;
     this.root.addChild(under(r, glow), node);
+    // Bó rơi từ xác in SỐ KIẾM lên bong bóng (ART_PROMPTS §8): một bó 3 kiếm và một bó 40
+    // kiếm nhìn y hệt nhau, mà quyết định có chạy tới nhặt hay không phụ thuộc đúng con số đó.
+    if (it.k === 'bundle' && (it.v ?? 0) > 1) {
+      this.count = bundleCount(it.v ?? 0, r);
+      this.root.addChild(this.count);
+    }
     this.root.position.set(it.x, it.y);
     this.root.zIndex = it.y - 1000;
   }
@@ -237,9 +275,15 @@ export class ItemSprite {
    * Tiên khí là hai đường tu tách hẳn (spec §3.4), nên viên không dùng được phải nhìn ra
    * ngay chứ không để người chơi chạy theo vô ích.
    */
-  update(now: number, absorbable = true): void {
+  update(now: number, absorbable = true, zoom = 1): void {
     this.root.pivot.y = Math.sin(now * 3 + this.phase) * 4;
     this.root.alpha = absorbable ? 1 : 0.3;
+    if (this.count) {
+      // Giữ cỡ CỐ ĐỊNH trên màn hình, giống bảng tên: camera lùi ra theo cảnh giới nên nhãn
+      // tính bằng đơn vị thế giới sẽ teo dần — đo được 7 px ở Luyện Hư, không đọc nổi. Mà
+      // con số này tồn tại đúng để người chơi quyết định có chạy tới nhặt hay không.
+      this.count.scale.set(COUNT_PX / 44 / Math.max(0.05, zoom));
+    }
   }
 
   destroy(): void {

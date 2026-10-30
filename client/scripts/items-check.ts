@@ -31,11 +31,11 @@ function artFor(kind: string): string[] {
       // vòng tròn trắng và một thanh nâu, không dán ảnh nào.
       return ['items/sword.png'];
     case 'bundle':
+      // Chủ dự án duyệt 30/10, prompt ở ART_PROMPTS §8. Vẽ to hơn bong bóng kiếm đơn 20%.
+      return ['items/bundle.png'];
     case 'tien_khi':
-      // Cố ý vẽ bằng Graphics, KHÔNG phải thiếu art — xem `placeholder()` trong entities.ts:
-      //   - `bundle`: ba lưỡi chéo buộc dây đỏ.
-      //   - `tien_khi`: viên vàng kim nhiều lớp sáng; kích thước và vành ngoài đổi theo giá
-      //     trị viên, nên một ảnh tĩnh không tả được.
+      // Cố ý vẽ bằng Graphics, KHÔNG phải thiếu art: viên vàng kim nhiều lớp sáng; kích
+      // thước và vành ngoài đổi theo giá trị viên, nên một ảnh tĩnh không tả được.
       return [];
     default:
       return [`buffs/${kind}.png`];

@@ -70,6 +70,8 @@ export class ClientWorld {
   private readonly deletedAt = new Map<number, number>();
   /** respawn2s: số lần nhấp nháy chưa báo cáo — xem takeRespawn2s. */
   private respawn2s = 0;
+  /** missingDesc: entity chưa biết vẽ nhân vật nào — xem takeMissingDesc. */
+  private readonly missingDesc = new Set<number>();
   private offset: number | null = null;
   private pending: PendingInput[] = [];
   private seq = 0;
@@ -151,6 +153,14 @@ export class ClientWorld {
         v.name = p.nm;
         v.char = p.ch ?? v.char;
       }
+      // Chưa biết nhân vật nào = chưa vẽ được. Ghi lại để HỎI server thay vì vẽ placeholder
+      // (NETCODE_SPEC §5 Hiển thị mục 2). Server chỉ gửi tên+nhân vật LẦN ĐẦU và nhớ là đã
+      // gửi; nếu client mất mô tả đó thì không hỏi là kẹt vĩnh viễn.
+      if (v.char === '') {
+        this.missingDesc.add(p.id);
+      } else {
+        this.missingDesc.delete(p.id);
+      }
       v.snaps.push({ t: s.tm, s: p });
       if (v.snaps.length > SNAP_KEEP) {
         v.snaps.shift();
@@ -210,6 +220,17 @@ export class ClientWorld {
         this.deletedAt.delete(id);
       }
     }
+  }
+
+  /**
+   * takeMissingDesc trả về danh sách entity chưa có mô tả, để gửi `DescRequest`.
+   *
+   * KHÔNG xoá khỏi tập: chỉ khi mô tả thật sự về tới (nhánh trên) mới xoá. Xoá ngay lúc hỏi
+   * thì gói `dreq` rơi mất là không bao giờ hỏi lại nữa — đúng cái bẫy mà tính năng này sinh
+   * ra để tránh. Người gọi tự giới hạn nhịp hỏi.
+   */
+  takeMissingDesc(): number[] {
+    return [...this.missingDesc];
   }
 
   /**

@@ -53,6 +53,46 @@ class AssetStore {
     return this.files.has(path);
   }
 
+  /**
+   * charAtlas lấy atlas nhân vật, có NHÂN VẬT DỰ PHÒNG (NETCODE_SPEC §5 Hiển thị mục 1).
+   *
+   * Build thật CẤM placeholder. Thiếu atlas của một nhân vật thì vẽ bằng nhân vật dự phòng
+   * — art thật, nhìn vẫn ra một người — chứ không vẽ vòng tròn màu kèm chữ viết tắt.
+   *
+   * Lý do cấm: vòng tròn placeholder là công cụ của người làm game, không phải thứ người
+   * chơi nên thấy. Ngày 30/10 telemetry đo được 12 khung placeholder trên server thật, và
+   * người chơi không có cách nào biết đó là "art chưa xong" hay "game hỏng".
+   *
+   * Trả về null chỉ khi KHÔNG CÓ nhân vật nào có atlas — lúc đó mới rơi về placeholder, và
+   * khi đó cả game đang thiếu art nên vòng tròn là đúng thứ cần hiện.
+   */
+  charAtlas(char: string): { set: AnimSet; fallback: boolean } | null {
+    const want = this.atlas(`characters/${char}`);
+    if (want) {
+      return { set: want, fallback: false };
+    }
+    for (const alt of this.fallbackChars) {
+      const set = this.atlas(`characters/${alt}`);
+      if (set) {
+        if (!this.warnedChars.has(char)) {
+          this.warnedChars.add(char);
+          console.warn(`thiếu atlas nhân vật "${char}" — dùng tạm "${alt}" (NETCODE_SPEC §5.1)`);
+        }
+        return { set, fallback: true };
+      }
+    }
+    return null;
+  }
+
+  /** fallbackChars: thứ tự thử nhân vật dự phòng. Đặt bởi `setFallbackChars` lúc có config. */
+  private fallbackChars: string[] = [];
+  private readonly warnedChars = new Set<string>();
+
+  /** setFallbackChars nhận danh sách nhân vật từ config (thứ tự trong config là thứ tự thử). */
+  setFallbackChars(chars: string[]): void {
+    this.fallbackChars = chars;
+  }
+
   /** Loads every listed single image plus atlases. Missing files are simply skipped. */
   async preload(onProgress?: (p: number) => void): Promise<void> {
     const singles = [...this.files].filter((f) => f.endsWith('.png') && !f.endsWith('atlas.png') && !f.includes('ref_sheet'));

@@ -1,0 +1,58 @@
+# CI — chặn những lỗi đã THẬT SỰ lọt tới người chơi, không phải chặn cho có.
+#
+# Mỗi bài kiểm dưới đây ra đời từ một lỗi cụ thể đã xảy ra:
+#   - check:assets       → ngày 30/10 đội test chơi bản có 12 khung placeholder (NETCODE §5.1)
+#   - check:items        → Bí Kíp hiện ra vòng tròn trắng vì tra nhầm thư mục art
+#   - check:telemetry-off→ bản release không được đóng gói module telemetry (TELEMETRY §1.6)
+#   - go test -race      → 6 lỗi tranh chấp dữ liệu giữa các goroutine khu đã bắt được
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: go vet
+        working-directory: server
+        run: go vet ./...
+      # `-race` chứ không chỉ `go test`: mỗi khu chạy một goroutine riêng, và lỗi tranh chấp
+      # dữ liệu ở đó không làm test đỏ — nó làm SERVER SẬP giữa trận, lúc có người đang chơi.
+      - name: go test -race
+        working-directory: server
+        run: go test -race ./...
+
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: npm ci
+        working-directory: client
+        run: npm ci
+      # Kiểm art TRƯỚC khi build: build xanh mà thiếu art thì vẫn ra một bản game vẽ
+      # placeholder, và đó đúng là thứ đã lọt tới đội test.
+      - name: thiếu art gây placeholder
+        working-directory: client
+        run: npm run check:assets
+      - name: mọi loại vật phẩm có ảnh
+        working-directory: client
+        run: npm run check:items
+      - name: build (tsc + vite)
+        working-directory: client
+        run: npm run build
+      - name: bản release không chứa telemetry
+        working-directory: client
+        run: npm run check:telemetry-off

@@ -346,6 +346,30 @@ class App {
     const skill = this.skillPressed;
     this.skillPressed = false;
     this.conn.send(this.world.makeInput(angle, moving, burn, skill));
+    this.askMissingDesc();
+  }
+
+  /** descAskAt: lần cuối gửi `DescRequest`, để không hỏi dồn dập. */
+  private descAskAt = 0;
+
+  /**
+   * askMissingDesc hỏi server mô tả của những entity client chưa biết vẽ gì
+   * (NETCODE_SPEC §5 Hiển thị mục 2).
+   *
+   * Giới hạn 1 lần / 0.5 giây: entity vừa vào khung nhìn thường có mô tả ngay ở gói kế
+   * tiếp, nên hỏi mỗi nhịp input (30 lần/giây) là bắn 30 gói thừa cho một thứ sắp tự đến.
+   */
+  private askMissingDesc(): void {
+    const now = performance.now();
+    if (now - this.descAskAt < 500) {
+      return;
+    }
+    const ids = this.world.takeMissingDesc();
+    if (ids.length === 0) {
+      return;
+    }
+    this.descAskAt = now;
+    this.conn.send({ t: 'dreq', ids: ids.slice(0, 32) });
   }
 
   private debugKey(e: KeyboardEvent): void {
@@ -476,6 +500,10 @@ async function boot(): Promise<void> {
   try {
     const cfg = await loadConfig();
     await assets.init();
+    // Thứ tự nhân vật dự phòng = thứ tự trong config (NETCODE_SPEC §5 Hiển thị mục 1).
+    // Thiếu atlas của một nhân vật thì vẽ bằng nhân vật đầu tiên CÓ atlas, không vẽ
+    // placeholder — build thật cấm placeholder.
+    assets.setFallbackChars(cfg.characters);
 await loadFonts(); // BitmapFont đủ dấu tiếng Việt cho bảng tên (spec §12.3)
     await assets.preload();
     sound.init();

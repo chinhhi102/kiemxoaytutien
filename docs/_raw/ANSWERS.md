@@ -241,3 +241,20 @@ Kế hoạch (b) **duyệt**. Bắt đầu Bước 2a → 2b ngay. Bài đo `fli
    - Anim nào **sau B vẫn đỏ** → đó là do bản thân frame vẽ khác dáng, không chuẩn hóa được: đưa vào danh sách sinh lại (ART_JOBS), ghi rõ frame nào. Dự đoán: co_ba_ganh `idle`, a_hon `teleport_in_01`, ong_ba_vong `realm_drop_05`.
    - Rồi **C** (bộ điều khiển: crossfade, giữ pha, fps theo tốc độ, lật có trễ, chuyển động phụ).
    - **A** (một thân nhiều mặt) để sau cùng vì cần art mới.
+
+---
+
+## Trả lời báo cáo B + C (build 9cff870)
+
+**B + C: duyệt.** Ba chỗ em tự chặn so với spec (trần ±15% co giãn, chấm cả 2 bản neo chân/không neo rồi giữ bản tốt hơn, phép kiểm kích thước mảnh khi cắt) — **chấp nhận**, ghi chú vào GAME_SPEC §12.5 B ở lần cập nhật spec tới. `check:items` tốt — thêm vào CI cùng `check:assets`.
+
+**1. dep_lao `idle` (56.8):** tôi sẽ tự xem bằng `J` + `]`. Trong lúc chờ, cho phép **đánh dấu ngoại lệ có chủ đích** trong `assets/jitter_exceptions.json` (tên anim + lý do + người duyệt) — anim có trong danh sách không tính đỏ nhưng vẫn hiện điểm. Chưa thêm dep_lao vào cho tới khi tôi xác nhận.
+
+**2. Bó Kiếm (`item_bundle`): ĐƯA VÀO, giữ đúng prompt em đã đặt** (3 kiếm bắt chéo buộc vải đỏ, cùng canvas với `item_sword`). ART_PROMPTS §8 đã ghi lại cho khớp. Sinh ảnh luôn. Trong game vẽ to hơn bong bóng kiếm thường 20%; bó rơi từ xác in số kiếm lên bong bóng. `sword` và `tien_khi` giữ vẽ tay như em đề xuất.
+
+**3. Nhờ push lên GitHub** mọi commit đã deploy (`9cff870` chưa có trên `main` — tôi chỉ thấy tới `a8a9cc8`), kèm `docs/anim_preview/`, để bên Claude chat đọc được onion-skin và GIF.
+
+**Tiếp theo:** netcode **bước 2b** (cấm placeholder build thật + đóng nút thắt B3), song song telemetry (hướng C) nếu chưa xong. **A** (một thân nhiều mặt) để sau, như đã chốt.
+
+
+> Ghi chú: `docs/QUESTIONS.md` bản tôi đọc còn ghi "việc lớn tiếp theo: tối ưu 25–27" — phần đó đã xong (mốc #4). Cập nhật lại QUESTIONS.md cho đúng hiện trạng; câu Bó Kiếm chuyển sang QUESTIONS_DONE.

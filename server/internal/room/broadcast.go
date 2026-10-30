@@ -49,6 +49,9 @@ func (r *Room) snapshotFor(z *Zone, c *Client, viewer *game.Player, events []gam
 	// Names go out the first time a client sees a player, and again every couple of seconds
 	// so a client that missed the first packet still recovers.
 	resendNames := z.namesDue
+	// Entity client vừa xin gửi lại mô tả (NETCODE_SPEC §5 Hiển thị mục 2). Trước đây client
+	// thiếu mô tả thì vẽ placeholder và chịu; giờ nó hỏi, và đây là chỗ trả lời.
+	asked := c.takeDescAsks()
 	// Người ở XA chỉ gửi 10 Hz thay vì 20 Hz (spec mục 27): client nội suy nên bỏ một nhịp
 	// không ai thấy, mà nửa số byte của người ở rìa màn hình thì tiết kiệm thật.
 	// Người MỚI thấy lần đầu luôn gửi ngay, nếu không họ "hiện ra" trễ nửa nhịp.
@@ -59,7 +62,7 @@ func (r *Room) snapshotFor(z *Zone, c *Client, viewer *game.Player, events []gam
 			continue
 		}
 		seen[p.ID] = true
-		known := c.knownPlayers[p.ID]
+		known := c.knownPlayers[p.ID] && !asked[p.ID]
 		if known && slow && p.ID != viewer.ID && p.Pos.Dist(viewer.Pos) > half {
 			continue
 		}
@@ -71,6 +74,8 @@ func (r *Room) snapshotFor(z *Zone, c *Client, viewer *game.Player, events []gam
 			delete(c.knownPlayers, id)
 		}
 	}
+	// Entity client hỏi mà KHÔNG còn trong tầm nhìn: bỏ qua trong im lặng. Hỏi về một người
+	// đã đi mất là chuyện bình thường (gói `dreq` và gói `Despawn` chạy ngược chiều nhau).
 	for _, m := range g.Monsters {
 		if !g.InView(viewer, m.Pos) {
 			continue

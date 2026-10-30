@@ -77,6 +77,7 @@ function fit(t: BitmapText, px: number): void {
 }
 
 export class Nameplate {
+  // (xem `rename` ở cuối lớp — tên không còn readonly vì view được dùng lại từ pool)
   readonly root = new Container();
   private readonly panel = new Graphics();
   private readonly ribbon = new Graphics();
@@ -99,7 +100,7 @@ export class Nameplate {
 
   constructor(
     private readonly cfg: GameConfig,
-    private readonly name: string,
+    private name: string,
     private readonly isMe: boolean,
     private readonly mobile: boolean,
   ) {
@@ -305,6 +306,18 @@ export class Nameplate {
         this.ribbon.alpha = 1 - t / dur;
       }
     }
+  }
+
+
+  /**
+   * rename đổi tên trên bảng tên tại chỗ, cho View Pool dùng lại view
+   * (NETCODE_SPEC §5 "View Pool" + mục Hiển thị 5 "đổi tại chỗ, không tạo lại view").
+   *
+   * Quên gọi hàm này khi lấy view ra khỏi pool là nhân vật mới hiện lên mang tên người cũ.
+   */
+  rename(name: string): void {
+    this.name = name;
+    this.nameText.text = name;
   }
 
   destroy(): void {

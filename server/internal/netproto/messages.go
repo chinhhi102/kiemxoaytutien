@@ -18,6 +18,9 @@ const (
 	// TTelemetry: mẫu hiệu năng của người chơi thật (TELEMETRY_SPEC §3). Gói "lạnh" — server
 	// KHÔNG xử lý nó trong vòng tick, chỉ đẩy sang goroutine ghi.
 	TTelemetry = "tm"
+	// TDescRequest: client xin gửi lại MÔ TẢ (tên + nhân vật) của một entity
+	// (NETCODE_SPEC §5 Hiển thị mục 2).
+	TDescRequest = "dreq"
 )
 
 // Envelope is decoded first to find the message type.
@@ -85,6 +88,17 @@ type Telemetry struct {
 	Session *telemetry.Session  `msgpack:"s,omitempty"`
 	Samples []*telemetry.Sample `msgpack:"m,omitempty"`
 	Events  []*telemetry.Event  `msgpack:"e,omitempty"`
+}
+
+// DescRequest: client thiếu mô tả của entity nên không biết vẽ nhân vật nào.
+//
+// Vì sao cần: tên và nhân vật chỉ gửi LẦN ĐẦU client thấy một người; server nhớ bằng
+// `knownPlayers`. Nếu client vì bất kỳ lý do gì mà mất mô tả đó (vứt view, mất gói, tải lại
+// atlas), server không hề biết và sẽ KHÔNG BAO GIỜ gửi lại — client kẹt vĩnh viễn với một
+// entity không biết vẽ gì. Trước đây nó vẽ placeholder; spec §5 cấm, nên phải hỏi lại.
+type DescRequest struct {
+	T   string   `msgpack:"t"`
+	IDs []uint32 `msgpack:"ids"`
 }
 
 type Welcome struct {
