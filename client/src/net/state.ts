@@ -46,6 +46,13 @@ export interface PlayerFrame {
 const CORRECTION_EPS = 0.5;
 
 const SNAP_KEEP = 30;
+/**
+ * Giữ entity thêm ngần này giây sau khi vắng mặt khỏi snapshot (NETCODE_SPEC §4.3).
+ *
+ * 2 giây là con số spec chọn, và nó phải LỚN HƠN HẲN nhịp 10 Hz của người ở xa (0,1 giây)
+ * — nếu không thì vẫn nhấp nháy, chỉ chậm hơn.
+ */
+const KEEP_GONE_SECS = 2;
 const OFFSET_DECAY = 0.0005; // lets the clock estimate adapt if latency grows
 
 /** ClientWorld holds the replicated world: interpolation for others, prediction for me. */
@@ -57,6 +64,8 @@ export class ClientWorld {
   readonly items = new Map<number, ItemState>();
   readonly brokenObstacles = new Map<number, boolean>();
   readonly obstacleHp = new Map<number, number>();
+  /** goneAt: lần đầu một entity vắng mặt khỏi snapshot — xem `expire`. */
+  private readonly goneAt = new Map<number, number>();
   private offset: number | null = null;
   private pending: PendingInput[] = [];
   private seq = 0;
@@ -83,6 +92,7 @@ export class ClientWorld {
     this.map = map;
     this.players.clear();
     this.monsters.clear();
+    this.goneAt.clear();
     this.items.clear();
     this.brokenObstacles.clear();
     this.obstacleHp.clear();
@@ -141,9 +151,38 @@ export class ClientWorld {
         v.snaps.shift();
       }
     }
-    for (const id of this.players.keys()) {
-      if (!seen.has(id)) {
-        this.players.delete(id);
+    this.expire(this.players, seen, s.tm);
+  }
+
+  /**
+   * expire xoá entity **sau khi vắng mặt liên tục `KEEP_GONE_SECS`**, không xoá ngay khi
+   * vắng một gói (NETCODE_SPEC §4.3, §4.4).
+   *
+   * Đây là gốc của lỗi nhấp nháy. Server CỐ Ý bỏ qua người/quái ở xa trên các tick lẻ để
+   * họ chỉ tốn 10 Hz thay vì 20 Hz (tối ưu mục 27) — nhưng client lại hiểu "vắng mặt một
+   * gói" là "đã rời đi", xoá khỏi bảng, và `scene.ts` huỷ luôn sprite. Kết quả: **mọi
+   * entity xa hơn nửa khung nhìn bị huỷ và dựng lại 10 lần mỗi giây.**
+   *
+   * Nó còn kéo theo lỗi placeholder: tên và nhân vật (`nm`, `ch`) chỉ gửi lần đầu client
+   * thấy một người, server nhớ bằng `knownPlayers` và không hề biết client đã tự vứt view.
+   * View dựng lại không có tên nhân vật → không tra được atlas → vẽ vòng tròn placeholder
+   * cho tới nhịp gửi lại tên (2 giây).
+   *
+   * Đo được trước khi sửa: **8/8 lần biến mất rồi quay lại trong 2 giây**, 1/3 nhân vật
+   * đang vẽ placeholder (`tools/browsertest/flicker.mjs`). Ngân sách NETCODE §1: cả hai = 0.
+   */
+  private expire<T>(m: Map<number, T>, seen: Set<number>, now: number): void {
+    for (const id of m.keys()) {
+      if (seen.has(id)) {
+        this.goneAt.delete(id);
+        continue;
+      }
+      const since = this.goneAt.get(id);
+      if (since === undefined) {
+        this.goneAt.set(id, now);
+      } else if (now - since >= KEEP_GONE_SECS) {
+        m.delete(id);
+        this.goneAt.delete(id);
       }
     }
   }
@@ -167,11 +206,7 @@ export class ClientWorld {
       }
       this.monsters.set(m.id, buf);
     }
-    for (const id of this.monsters.keys()) {
-      if (!seen.has(id)) {
-        this.monsters.delete(id);
-      }
-    }
+    this.expire(this.monsters, seen, s.tm);
   }
 
   private applyObstacleEvents(events: GameEvent[]): void {

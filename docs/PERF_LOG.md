@@ -123,6 +123,42 @@ Việc tiếp theo đề xuất:
 
 ---
 
+### Lượt #5 — NETCODE bước 2a: chống nhấp nháy & placeholder (2026-10-30, nhánh `netcode-2a`)
+
+Mục tiêu: hai chỉ số §1 đang hỏng hẳn — entity respawn trong 2 s, và khung có placeholder.
+Cả hai ngân sách đều là **0**.
+
+Thay đổi (NETCODE_SPEC §4.3, §4.4, §5 Hiển thị 4–5):
+- `state.ts`: giữ entity thêm **2 giây** sau khi vắng mặt, thay vì xoá ngay khi vắng một gói.
+- `scene.ts` + `PlayerSprite.setCharacter`: đổi nhân vật **tại chỗ**, không huỷ rồi dựng lại.
+- Mờ dần vào 120 ms khi nhân vật lọt vào khung hình.
+
+Kết quả (`flicker.mjs`, **bot đi qua lại đúng mép khung nhìn 30 giây**, như bài kiểm tra §7):
+
+| Chỉ số | Trước | Sau | Ngân sách §1 |
+|---|---|---|---|
+| Entity respawn trong 2 s | **38** | **0** | 0 ✅ |
+| Khung có placeholder | **462 / 596 (78%)** | **0 / 595** | 0 ✅ |
+| Entity rời đi (thật) | 44 | 3 | – |
+
+44 → 3 là đúng: ba lần còn lại là entity rời đi **thật** và được xoá sau 2 giây chờ.
+
+Nút thắt đã đóng: **B3**.
+
+Bị chặn / chưa làm được:
+- **View Pool** (§5 L2) và **mờ dần RA 150 ms** chưa làm — thuộc bước 2b, cần chỗ giữ view
+  sau khi despawn. Bản 2a đã đủ đưa hai chỉ số về 0, nên tách ra cho commit gọn.
+- `DescRequest`, cấm placeholder ở build thật, `check:assets` — bước 2b.
+
+Tác dụng phụ / rủi ro:
+- Người **rời phòng thật** nay còn đứng im tối đa 2 giây trước khi biến mất. Đúng ý
+  NETCODE §4.3 (`Despawn` sau 2 s ngoài tầm), nhưng là thay đổi nhìn thấy được.
+- Bộ nhớ: tối đa thêm 2 giây entity trong bảng — không đáng kể ở quy mô 60 nhân vật.
+
+Việc tiếp theo: bước 2b (View Pool, mờ ra, cấm placeholder build thật, `check:assets`).
+
+---
+
 ### Mẫu — copy cho mỗi lượt
 
 ```
@@ -153,7 +189,7 @@ Việc tiếp theo đề xuất: <1–3 việc, xếp theo lợi ích / công s�
 |---|---|---|---|---|---|
 | B1 | ItemsAdded dồn 1 gói khi camera lùi xa | Gói 38 KB, nghẽn mạng yếu | Lượt #0 | **Đóng** — gói 38.3 → 6.8 KB | #4 |
 | B2 | Server tick vượt ngân sách khi 10 Đạo Tổ chụm | Lag server | Lượt #0 | **Đóng** — tick 11.45 → 1.56 ms | #4 |
-| B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Đo: **8/8 lần respawn trong 2s**, 1/3 nhân vật placeholder (`tools/browsertest/flicker.mjs`) | Mở — đã tìm ra nguyên nhân, xem `docs/NETCODE_PLAN.md` | – |
+| B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Trước **38 lần respawn/30s · 462/596 khung placeholder** → sau **0 / 0** (`flicker.mjs`, bot đi qua lại mép khung nhìn 30s) | **Đóng** bằng bản rẻ ở client; bước 3 sẽ thay bằng `Despawn` tường minh | #5 |
 | B4 | Băng thông game thật 61.7 KB/s | Mạng yếu | Lượt #0b | Mở — S2 còn **45.5 KB/s đỉnh** ở tab Đạo Tổ (ngân sách 40) | – |
 | B5 | Gói snapshot 6.8 KB vs ngân sách mới 6 KB | Mạng yếu | Lượt #4 | Mở — cần Protocol v2 nhị phân (NETCODE bước 3) | – |
 | **B6** | **Bài đo S3 không nâng được Đạo Tổ**; draw call đọc ra 0 | Không đánh giá được kịch bản nặng trên mạng yếu | Lượt #4 | Mở — **phải sửa trước khi tin số S3** | – |

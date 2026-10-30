@@ -8,3 +8,5 @@ run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_pea
 4,2026-10-30,f5720c0,"Mốc chuẩn - client mạng thường",S2,0.7,1.6,,19.5,45.5,2.5,342,7.6,3.6,2.5,0,4916,,,,,,,"FPS 10 tab headless không đại diện; draw call không đo được"
 4,2026-10-30,f5720c0,"Mốc chuẩn - client 4G yếu",S3,0.3,0.5,,7.7,13.6,0.6,22,,,,,,,,,,,,"chỉ tab thường; 0/5 tab lên được Đạo Tổ (mất ngữ cảnh WebGL)"
 4,2026-10-30,f5720c0,"Mốc chuẩn - nhịp chơi",S5,,,,,,,,,,,,,,,,,,4.70,"2.10->4.70 do luật v5.8 về sàn cảnh giới"
+5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (trước)",FLICKER,,,,,,,,,,,,,,462,76,,,,"38 lần respawn/30s; 462/596 khung có placeholder"
+5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (sau)",FLICKER,,,,,,,,,,,,,,0,0,,,,"0 respawn, 0 khung placeholder — đạt ngân sách §1"
