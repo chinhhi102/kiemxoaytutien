@@ -267,12 +267,12 @@ func itemJobs() []Job {
 	sprite := func(name, out string, size int, prompt string) Job {
 		return Job{Name: name, Priority: 0, Mode: modeSprite, Out: out, W: size, H: size, Pivot: "center", Prompt: styleObject + " " + prompt + negative}
 	}
-	jobs := []Job{sprite("item_sword", "items/sword.png", 256, "A glossy transparent soap bubble containing a small glowing sword, shiny highlight.")}
+	jobs := []Job{sprite("item_sword", "items/sword.png", 128, "A glossy transparent soap bubble containing a small glowing sword, shiny highlight.")}
 	for _, c := range []struct{ id, color string }{{"orb_small", "green"}, {"orb_medium", "blue"}, {"orb_large", "gold"}} {
 		jobs = append(jobs, sprite("item_"+c.id, "items/"+c.id+".png", 128, "A glowing "+c.color+" spirit orb gem, sparkly, round."))
 	}
 	for _, b := range buffIcons {
-		jobs = append(jobs, sprite("buff_"+b.id, "buffs/"+b.id+".png", 256,
+		jobs = append(jobs, sprite("buff_"+b.id, "buffs/"+b.id+".png", 128,
 			"A glossy transparent soap bubble containing "+b.icon+", tinted "+b.color+", shiny highlight."))
 	}
 	chest := "an ornate wooden treasure chest wrapped in red ribbons, glowing golden light leaking out, 3/4 top-down view"
@@ -309,7 +309,7 @@ func mapJobs() []Job {
 		names[i] = decorID(d)
 	}
 	segs := []Seg{
-		{Anim: "decor", Frames: 10, Out: "decor", Names: names, W: 256, H: 256, Pivot: "center", Each: true,
+		{Anim: "decor", Frames: 10, Out: "decor", Names: names, W: 128, H: 128, Pivot: "center", Each: true,
 			Poses: "ten different props in this order: " + strings.Join(decorList, ", ")},
 		{Anim: "wall", Frames: 1, Out: "decor", Names: []string{"wall_border"}, W: 1024, H: 256, Pivot: "center", Each: true,
 			Poses: "one wide seamless horizontal stone and bamboo fence segment, tileable left-right"},
@@ -334,6 +334,14 @@ func decorID(d string) string {
 
 // Obstacle canvases are square: the client keeps the art's aspect and repeats it along long
 // fences and walls instead of stretching it to the hitbox.
+//
+// 512 là cỡ ĐÚNG, đo ngày 30/10 chứ không ước lượng: ở mức thu phóng gần nhất (Luyện Khí)
+// quầy hàng vẽ ra 220 px, xe đẩy 245 px, tường đá 230 px — tức ảnh 512 chỉ dư khoảng 2 lần,
+// vừa đủ để không bị rỗ khi camera kéo gần.
+//
+// `boulder` từng để 1024 và đó là lỗi: ngoài bản đồ nó rộng trung bình 208 đơn vị, CÒN NHỎ
+// HƠN quầy hàng (246) vốn chỉ dùng 512. Một mình boulder (8 ảnh + 6 vỡ + 6 mọc lại) chiếm
+// 80 MB texture GPU trong tổng 607 MB mà client phải nạp — xem ghi chú ở atlas.go.
 var obstacles = []struct {
 	id, desc string
 	w, h     int
@@ -342,7 +350,7 @@ var obstacles = []struct {
 	{"stall", "a street market stall with a striped canopy and fruit baskets", 512, 512},
 	{"cart", "a wooden street food cart with a small stove", 512, 512},
 	{"brick", "a short horizontal red brick wall segment with moss", 512, 512},
-	{"boulder", "a huge round grey boulder with cartoon crack lines", 1024, 1024},
+	{"boulder", "a huge round grey boulder with cartoon crack lines", 512, 512},
 	{"stone_wall", "an ancient mossy horizontal stone wall with carved patterns", 512, 512},
 }
 

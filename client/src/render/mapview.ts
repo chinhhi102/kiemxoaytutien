@@ -1,4 +1,4 @@
-import { AnimatedSprite, ColorMatrixFilter, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { AnimatedSprite, ColorMatrixFilter, Container, Graphics, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 
 import type { ClientWorld } from '../net/state';
 import type { GameMap, MapObstacle, Shape } from '../net/protocol';
@@ -212,6 +212,43 @@ export class MapView {
     const filter = backgroundFilter();
     this.ground.filters = [filter];
     this.decor.filters = [filter];
+    // `filterArea` BẮT BUỘC phải đặt — xem clampFilterArea. Đặt tạm một ô nhỏ ở đây để
+    // khung hình đầu tiên (trước khi `update` chạy lần nào) cũng không cấp phát cả bản đồ.
+    this.ground.filterArea = new Rectangle(0, 0, 1, 1);
+    this.decor.filterArea = new Rectangle(0, 0, 1, 1);
+  }
+
+  /**
+   * clampFilterArea giới hạn vùng bộ lọc màu nền vào đúng phần đang nhìn thấy.
+   *
+   * Không có nó, PixiJS cấp phát render texture bằng KÍCH THƯỚC CẢ CONTAINER để chạy bộ lọc.
+   * `ground` trải khắp bản đồ 12 000×12 000, làm tròn lên lũy thừa 2 là **16 384×16 384 ×4
+   * byte = 1 024 MB** cho một tấm texture duy nhất — đo được trên máy thật ngày 30/10, lớn
+   * gấp ba lần toàn bộ art của game cộng lại.
+   *
+   * Hậu quả không phải là "hơi chậm": laptop dùng GPU tích hợp thường có `MAX_TEXTURE_SIZE`
+   * 8 192 hoặc ít VRAM hơn 1 GB, nên lệnh cấp phát HỎNG — và mặt đất hiện ra trắng trơn chỉ
+   * còn nét viền, đúng ảnh chụp của đội test lúc 12:18. Máy bàn có GPU rời nuốt được 1 GB
+   * nên lỗi này không bao giờ xuất hiện ở máy dev.
+   *
+   * Giới hạn vào khung nhìn thì tấm texture chỉ còn cỡ màn hình (~1280×720), và hình hiện ra
+   * y hệt: bộ lọc này chỉ đổi màu từng điểm ảnh, không lấy mẫu điểm bên cạnh, nên cắt vùng
+   * không làm sai kết quả.
+   */
+  private clampFilterArea(view: { x: number; y: number; w: number; h: number }): void {
+    // Nới mỗi bên một chút để lúc camera chạy không thấy mép vùng lọc quét theo.
+    const pad = 64;
+    const x = view.x - view.w / 2 - pad;
+    const y = view.y - view.h / 2 - pad;
+    const w = view.w + pad * 2;
+    const h = view.h + pad * 2;
+    for (const c of [this.ground, this.decor]) {
+      const r = c.filterArea as Rectangle;
+      r.x = x;
+      r.y = y;
+      r.width = w;
+      r.height = h;
+    }
   }
 
   /** obstacleLayer returns every obstacle node, to be added to the y-sorted entity layer. */
@@ -463,6 +500,7 @@ export class MapView {
     this.updateWater(now);
     if (view) {
       this.decals.update(view.x, view.y, view.w / 2, view.h / 2);
+      this.clampFilterArea(view);
     }
     for (const n of this.obstacleNodes.values()) {
       this.updateObstacle(n, w, now);

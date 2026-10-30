@@ -10,6 +10,7 @@ server/bin/
 # ra đây. Mỗi cái gần 10 MB, đổi mỗi lần build, không ai cần bản của máy người khác.
 # Chạy bằng `go run ./cmd/<x>` thì không sinh ra file nào.
 server/artgen
+server/kxserver
 server/loadtest
 server/mapgen
 server/sim

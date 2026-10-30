@@ -13,7 +13,22 @@ import (
 	"strings"
 )
 
-const atlasCell = 256
+// atlasCell: cạnh một ô khung trong atlas, tính bằng pixel.
+//
+// Để 256 làm NGỘP BỘ NHỚ TEXTURE của máy người chơi thật. Đo ngày 30/10 trên server :9999:
+// client nạp 419 ảnh = **607 MB** texture GPU, riêng 11 atlas nhân vật đã 220 MB (mỗi atlas
+// 2560×2304 ×4 byte = 22.5 MB). Laptop dùng GPU tích hợp chia sẻ VRAM với hệ thống thường
+// chỉ được vài trăm MB cho một tab, nên driver vứt texture và cả mặt đất lẫn nhân vật hiện
+// ra TRẮNG TRƠN chỉ còn nét viền — đúng ảnh chụp của đội test lúc 12:18.
+//
+// 128 là đủ, đo bằng số chứ không ước lượng: nhân vật vẽ ra màn hình cao **87 px** ở Luyện
+// Khí và **30 px** ở Đạo Tổ (camera lùi ra theo cảnh giới). Ô 256 tức là thừa 3–8 lần. Ô 128
+// vẫn còn dư so với 87 px, mà tốn đúng 1/4: 220 MB → 55 MB.
+//
+// Đổi số này KHÔNG phải sửa client: client đọc `cell` trong atlas.json và co theo chiều cao
+// texture thật (`k = h / sp.texture.height` trong render/player.ts), nên cỡ nhân vật trên
+// màn hình không đổi.
+const atlasCell = 128
 
 var frameRe = regexp.MustCompile(`^([a-z_]+)_(\d{2})\.png$`)
 
