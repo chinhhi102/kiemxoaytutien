@@ -30,13 +30,20 @@ case "${1:-}" in
     go run ./cmd/artgen preview "$@"
     ;;
   *)
-    echo "== 1/3 chuẩn hoá frame (B.1–3) =="
-    go run ./cmd/artgen normalize
-    echo
-    echo "== 2/3 ghép atlas từ frames_norm =="
+    # Thứ tự BẮT BUỘC là cắt → chuẩn hoá → ghép, và `prep` làm cả cắt lẫn ghép nên phải
+    # chạy hai lần. Làm ngược (chuẩn hoá trước) thì `normalize` đọc frame CŨ, rồi `prep` cắt
+    # lại `frames/` từ ảnh thô — atlas cuối cùng ghép từ bản chuẩn hoá của frame đã lỗi thời.
+    # Tôi đã chạy nhầm đúng thứ tự đó một lần; không có dòng ghi chú này thì lần sau lại nhầm.
+    echo "== 1/4 cắt frame từ ảnh thô =="
     go run ./cmd/artgen prep
     echo
-    echo "== 3/3 chấm lại điểm độ giật (B.5) =="
+    echo "== 2/4 chuẩn hoá frame (B.1–3) =="
+    go run ./cmd/artgen normalize
+    echo
+    echo "== 3/4 ghép lại atlas từ frames_norm =="
+    go run ./cmd/artgen prep
+    echo
+    echo "== 4/4 chấm lại điểm độ giật (B.5) =="
     go run ./cmd/artgen jitter -norm
     ;;
 esac

@@ -4,6 +4,7 @@ import type { GameConfig } from '../config';
 import type { PlayerFrame } from '../net/state';
 import { BUFFS, FLAG, statusOn } from '../net/protocol';
 import { assets, type AnimSet } from './assets';
+import { AnimController, type AnimOut } from './animctl';
 import { animJitter, JITTER_RED } from './jitter';
 import { animShort, initials } from './catalog';
 import { BUFF_COLORS, charColor } from './palette';
@@ -58,6 +59,14 @@ export class PlayerSprite {
   private statusKey = '';
   /** bornAt: lúc view bắt đầu được vẽ, để mờ dần vào. */
   private bornAt = 0;
+  /** ctl: bộ điều khiển hoạt ảnh (GAME_SPEC §12.5 C). */
+  private readonly ctl = new AnimController();
+  /** ghost: lớp animation cũ mờ dần trong lúc crossfade. */
+  private ghost: AnimatedSprite | null = null;
+  private animFps = 12;
+  private lastPos = { x: 0, y: 0 };
+  private lastFace = 0;
+  private lastAt = 0;
   /** animInfo: dòng chữ của phím debug `J` (GAME_SPEC §12.5 C, dòng cuối). */
   private readonly animInfo = new Text({ text: '', style: { fontSize: 32, fontWeight: '700', fill: 0x8ef58e, stroke: { color: 0x000000, width: 6 } } });
 
@@ -197,7 +206,24 @@ export class PlayerSprite {
     this.root.position.set(f.x, f.y);
     this.root.zIndex = f.y + r * FEET_BELOW_CENTER; // y-sort by the feet (spec §8.2)
     this.drawShadow(r);
-    this.updateBody(moodName(s.md), r, Math.cos(s.f) < 0);
+    // Tốc độ và tốc độ rẽ lấy từ VỊ TRÍ ĐÃ NỘI SUY (`f.x`, `f.y`), không từ gói tin thô —
+    // GAME_SPEC §12.5 C "không giật theo mạng". Lấy từ gói thô thì mỗi lần mạng nấc một cái
+    // là nhịp chân và độ nghiêng của nhân vật giật theo.
+    const dt = this.lastAt > 0 ? Math.min(0.1, now - this.lastAt) : 0;
+    let speed = 0;
+    let turn = 0;
+    if (dt > 0) {
+      speed = Math.hypot(f.x - this.lastPos.x, f.y - this.lastPos.y) / dt;
+      let df = s.f - this.lastFace;
+      while (df > Math.PI) { df -= Math.PI * 2; }
+      while (df < -Math.PI) { df += Math.PI * 2; }
+      turn = df / dt;
+    }
+    this.lastPos = { x: f.x, y: f.y };
+    this.lastFace = s.f;
+    this.lastAt = now;
+    this.ctl.setFacing(Math.cos(s.f) >= 0, now);
+    this.updateBody(moodName(s.md), r, dt, speed, turn, now);
     this.drawAura(s.bf, r, now);
     if (s.fl & FLAG.burning) {
       this.drawBurn(r, now); // vẽ đè lên aura buff
@@ -254,16 +280,34 @@ export class PlayerSprite {
     this.shadow.clear().ellipse(0, r * FEET_BELOW_CENTER, r * 0.9, r * 0.35).fill({ color: 0x000000, alpha: 0.25 });
   }
 
-  private updateBody(mood: string, r: number, flip: boolean): void {
+  private updateBody(mood: string, r: number, dt: number, speed: number, turn: number, now: number): void {
     if (this.atlas) {
-      this.setMood(mood);
+      // GAME_SPEC §12.5 C — bộ điều khiển quyết định pha, lật, nghiêng, nhún; `setMood` chỉ
+      // còn việc đổi bộ texture khi controller đã cho phép.
+      const urgent = mood === 'hit' || mood === 'death' || mood === 'respawn';
+      if (this.ctl.setMood(mood, now, urgent)) {
+        this.setMood(mood);
+      }
+      const a = this.ctl.step(dt, speed, turn, this.animFps, now);
       const h = (r * CHAR_HEIGHT_PER_R) / ART_FILL; // world height of the whole 512 canvas
       const sp = this.body as AnimatedSprite;
       const k = h / sp.texture.height;
-      sp.scale.set(flip ? -k : k, k);
-      sp.position.set(0, r * FEET_BELOW_CENTER);
+      sp.scale.set(a.flipX * k, k * a.scaleY);
+      sp.position.set(0, r * FEET_BELOW_CENTER + a.bobY * r);
+      sp.rotation = a.lean;
+      // Chu kỳ chạy do controller lái, không để AnimatedSprite tự chạy: có thế thì pha mới
+      // giữ được khi đổi run ↔ chase ↔ flee, và nhịp chân mới khớp tốc độ thật.
+      if (sp.textures.length > 0 && this.ctl.current !== 'death') {
+        const n = sp.textures.length;
+        sp.gotoAndStop(Math.min(n - 1, Math.floor(a.phase * n)));
+      }
+      this.fadeGhost(a, r, k);
       return;
     }
+    void dt;
+    void speed;
+    void turn;
+    void now;
     const body = this.body as Container;
     if (this.mood !== mood) {
       this.mood = mood;
@@ -273,6 +317,39 @@ export class PlayerSprite {
     body.scale.set(r, r);
     const squash = mood === 'hit' || mood === 'death' ? 0.7 : 1;
     body.scale.y = r * squash;
+  }
+
+  /**
+   * fadeGhost vẽ lớp animation CŨ mờ dần chồng lên trong lúc crossfade (spec: 80–120 ms).
+   *
+   * Dùng một sprite phụ thay vì trộn texture: PixiJS không trộn được hai bộ frame trong một
+   * AnimatedSprite, mà cắt cứng từ dáng này sang dáng khác trong một khung hình là đúng cái
+   * cảm giác "giật" cần bỏ.
+   */
+  private fadeGhost(a: AnimOut, r: number, k: number): void {
+    if (a.fadeOut <= 0 || !a.prevAnim) {
+      if (this.ghost) {
+        this.ghost.visible = false;
+      }
+      return;
+    }
+    const anim = this.findAnim(a.prevAnim);
+    if (!anim) {
+      return;
+    }
+    if (!this.ghost) {
+      this.ghost = new AnimatedSprite(anim.textures);
+      this.ghost.anchor.set(this.atlas?.pivotX ?? 0.5, this.atlas?.pivotY ?? 0.9);
+      this.bodyBox.addChildAt(this.ghost, 0);
+    }
+    const g = this.ghost;
+    g.visible = true;
+    g.textures = anim.textures;
+    g.gotoAndStop(Math.min(anim.textures.length - 1, Math.floor(a.phase * anim.textures.length)));
+    g.scale.set(a.flipX * k, k * a.scaleY);
+    g.position.set(0, r * FEET_BELOW_CENTER + a.bobY * r);
+    g.rotation = a.lean;
+    g.alpha = a.fadeOut;
   }
 
   private setMood(mood: string): void {
@@ -292,9 +369,10 @@ export class PlayerSprite {
     }
     const sp = this.body as AnimatedSprite;
     sp.textures = anim.textures;
-    sp.animationSpeed = anim.fps / 60;
     sp.loop = anim.loop;
-    sp.gotoAndPlay(0);
+    this.animFps = anim.fps;
+    // KHÔNG `gotoAndPlay`: khung hình do `AnimController` chọn theo pha (xem updateBody).
+    sp.stop();
   }
 
   private findAnim(mood: string): { textures: Texture[]; fps: number; loop: boolean } | null {
