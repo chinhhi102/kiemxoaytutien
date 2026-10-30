@@ -56,6 +56,10 @@ type Client struct {
 	// được ghi từ goroutine đọc WebSocket và đọc từ goroutine phòng.
 	descAsk map[uint32]bool
 
+	// aoi theo dõi client này đã biết những entity nào, để gửi `Despawn` tường minh
+	// (NETCODE_SPEC §4.3). Chỉ goroutine phòng đụng tới.
+	aoi *aoiTracker
+
 	evMu     sync.Mutex
 	evWindow time.Time
 	evCount  int
@@ -79,6 +83,13 @@ func NewClient(c Conn, debug bool) *Client {
 // khác, vì sang khu là đổi hẳn bản đồ, mọi id cũ không còn nghĩa gì.
 func (c *Client) resetKnown() {
 	c.knownPlayers, c.knownMonsters = map[uint32]bool{}, map[uint32]int{}
+	// Đổi phòng/khu là quên sạch: entity của khu cũ không còn liên quan, và giữ lại thì
+	// gói đầu tiên ở khu mới sẽ chở một đống `Despawn` vô nghĩa.
+	if c.aoi == nil {
+		c.aoi = newAOITracker()
+	} else {
+		c.aoi.Forget()
+	}
 	c.knownItems = c.knownItems[:0]
 	c.knownSlots = c.knownSlots[:0]
 }

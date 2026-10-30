@@ -1,6 +1,7 @@
 package room
 
 import (
+	"math"
 	"sort"
 
 	"kiemxoay/server/internal/game"
@@ -57,7 +58,24 @@ func (r *Room) snapshotFor(z *Zone, c *Client, viewer *game.Player, events []gam
 	// Người MỚI thấy lần đầu luôn gửi ngay, nếu không họ "hiện ra" trễ nửa nhịp.
 	half := g.ViewHalfExtentsX(viewer) / 2
 	slow := z.tick%farRateDivisor != 0
+	// Ứng viên cho bộ theo dõi vòng đời (NETCODE_SPEC §4.3, §4.4) — xem `aoi.go`.
+	hw, hh := g.ViewHalfExtents(viewer)
+	cands := make([]entityIn, 0, len(g.Players))
 	for _, p := range g.PlayerList() {
+		// Ứng viên gồm MỌI người còn trong khu, kể cả người đang ngoài tầm nhìn.
+		//
+		// Bản đầu tôi lọc bằng `CanSee` trước rồi mới đưa vào đây, và nó làm respawn TỆ ĐI
+		// (đo được: một lượt 9 lần, trước đó 2/16 lượt có 1). Lý do: người ra khỏi tầm nhìn
+		// biến mất khỏi danh sách ứng viên, nên bộ theo dõi rơi vào nhánh "không còn tồn
+		// tại" và `Despawn` NGAY — mất sạch hạn trễ 2 giây mà nó sinh ra để có.
+		//
+		// Ẩn (bụi rậm, Ẩn Thân, đang qua cổng) thì cho khoảng cách VÔ CÙNG: vẫn đi qua hạn
+		// trễ như người đi xa, không bị xoá đột ngột.
+		dist := math.Inf(1)
+		if g.CanSee(viewer, p) {
+			dist = chebyshevOutside(p.Pos.X-viewer.Pos.X, p.Pos.Y-viewer.Pos.Y, hw, hh)
+		}
+		cands = append(cands, entityIn{ID: p.ID, Dist: dist})
 		if !g.CanSee(viewer, p) {
 			continue
 		}
@@ -68,6 +86,18 @@ func (r *Room) snapshotFor(z *Zone, c *Client, viewer *game.Player, events []gam
 		}
 		s.Players = append(s.Players, playerState(g, viewer, p, resendNames || !known))
 		c.knownPlayers[p.ID] = true
+	}
+	// `Despawn` TƯỜNG MINH (§4.3): nói thẳng ai đã rời đi, thay vì để client đoán bằng cách
+	// đợi 2 giây im lặng. Đoán là cách duy nhất client có ở bước 2b, và nó không bao giờ
+	// phân biệt được "server bỏ qua ở tick lẻ" với "người đó đi thật" — đó là phần respawn
+	// còn sót (2/16 lượt có 1).
+	//
+	// Chỉ lấy `Despawn` từ bộ theo dõi; `Spawn`/`Update` vẫn đi bằng đường v1 cho tới khi
+	// bật hẳn Protocol v2. Làm từng bước thế này thì đo được tác dụng của riêng `Despawn`.
+	for _, ev := range c.aoi.Step(g.Time, cands) {
+		if ev.Kind == LifeDespawn {
+			s.Despawn = append(s.Despawn, ev.ID)
+		}
 	}
 	for id := range c.knownPlayers {
 		if _, alive := g.Players[id]; !alive {

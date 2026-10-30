@@ -243,6 +243,12 @@ type Snapshot struct {
 	ItemsAdded   []ItemState    `msgpack:"ia,omitempty"`
 	ItemsRemoved []uint32       `msgpack:"ir,omitempty"`
 	Events       []game.Event   `msgpack:"ev,omitempty"`
+	// Despawn: id những entity đã RỜI ĐI THẬT (NETCODE_SPEC §4.3).
+	//
+	// Trước đây client phải tự đoán: "vắng mặt quá 2 giây thì chắc đã đi". Đoán đó sai theo
+	// CẢ HAI hướng — vắng vì server bỏ qua ở tick lẻ thì xoá oan (nhấp nháy), còn người đi
+	// thật thì giữ lại thừa 2 giây. Giờ server nói thẳng.
+	Despawn []uint32 `msgpack:"ds,omitempty"`
 	// SrvMs: thời gian server xử lý một tick của phòng, mili-giây. Chỉ để đo (spec §13.6),
 	// client hiện lên overlay F3 để biết nghẽn nằm ở server hay ở máy mình.
 	SrvMs float32 `msgpack:"sv,omitempty"`

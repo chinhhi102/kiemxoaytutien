@@ -73,7 +73,7 @@ const watch = p.evaluate(async (ms) => {
     }
     await new Promise((r) => setTimeout(r, 50));
   }
-  return { gone, respawn2s, maxSeen, placeholderFrames, frames };
+  return { gone, respawn2s, maxSeen, placeholderFrames, frames, theo: { ...window.kx.world.respawnBy } };
 }, WATCH_MS);
 
 await walk();

@@ -111,6 +111,13 @@ export interface Snapshot {
   ia?: WireItemState[];
   ir?: number[];
   ev?: GameEvent[];
+  /**
+   * ds: id những entity server báo đã RỜI ĐI THẬT (NETCODE_SPEC §4.3).
+   *
+   * Trước đây client tự đoán bằng "vắng mặt quá 2 giây". Đoán sai cả HAI chiều: vắng vì
+   * server bỏ qua ở tick lẻ thì xoá oan (nhấp nháy), còn người đi thật thì giữ thừa 2 giây.
+   */
+  ds?: number[];
   /** sv: thời gian server xử lý một tick của phòng (ms) — chỉ để overlay đo (spec §13.6). */
   sv?: number;
 }

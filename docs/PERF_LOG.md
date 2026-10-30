@@ -275,6 +275,7 @@ Việc tiếp theo đề xuất: <1–3 việc, xếp theo lợi ích / công s�
 |---|---|---|---|---|---|
 | B1 | ItemsAdded dồn 1 gói khi camera lùi xa | Gói 38 KB, nghẽn mạng yếu | Lượt #0 | **Đóng** — gói 38.3 → 6.8 KB | #4 |
 | B2 | Server tick vượt ngân sách khi 10 Đạo Tổ chụm | Lag server | Lượt #0 | **Đóng** — tick 11.45 → 1.56 ms | #4 |
+| B3b | **Chỉ số respawn DAO ĐỘNG MẠNH giữa các lượt** | Phương pháp đo | Cùng một bản build, 8 lượt `flicker.mjs` liên tiếp ra 0,0,0,2,3,1,0,0. Số `gone` trong lượt dao động 1–22 tuỳ bao nhiêu bot đi ngang. Những con số "2/13 lượt" và "0/8 lượt" ghi ở các dòng trước **không đủ mẫu để kết luận** — tôi đã dùng chúng để so hai cấu hình và kết luận sai. | **Mở.** Cần kịch bản có kiểm soát (số bot cố định, đường đi cố định) hoặc ≥30 lượt mỗi cấu hình trước khi so | #8, #9 |
 | B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Trên `:9999` THẬT, 16 lượt `flicker.mjs` sau bước 2b: **placeholder 0/16 lượt** (trước 2b: 252/0/24/4/0), **respawn 2/16 lượt có đúng 1** (trước 2b ~1.0/30s, trước 2a 38/30s) | **Placeholder: đóng.** Respawn: còn hở, cần `Despawn` tường minh từ server (bước 3) — client không phân biệt được "vắng mặt do AOI" với "đã rời đi thật" | #5, #7, #8 |
 | B4 | Băng thông game thật 61.7 KB/s | Mạng yếu | Lượt #0b | Mở — S2 còn **45.5 KB/s đỉnh** ở tab Đạo Tổ (ngân sách 40) | – |
 | B5 | Gói snapshot 6.8 KB vs ngân sách mới 6 KB | Mạng yếu | Lượt #4 | Mở — cần Protocol v2 nhị phân (NETCODE bước 3) | – |

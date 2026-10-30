@@ -70,6 +70,18 @@ export class ClientWorld {
   private readonly deletedAt = new Map<number, number>();
   /** respawn2s: số lần nhấp nháy chưa báo cáo — xem takeRespawn2s. */
   private respawn2s = 0;
+  /**
+   * whyGone[id] = lý do entity bị xoá, để biết nhấp nháy đến từ đâu.
+   *
+   * 'ds' = server bảo đi (Despawn tường minh), 'hethan' = luật 2 giây im lặng cũ. Hai
+   * nguyên nhân khác hẳn nhau và cần hai cách chữa khác hẳn nhau — không tách ra thì chỉ
+   * còn cách đoán, và tôi đã đoán sai hai lần liền.
+   */
+  readonly whyGone = new Map<number, string>();
+  /** respawnBy: đếm nhấp nháy theo nguyên nhân, cho bài đo đọc. */
+  readonly respawnBy = { ds: 0, hethan: 0 };
+  /** despawnTold: số lần server báo `Despawn`. Chỉ để đo — client chưa hành động theo. */
+  despawnTold = 0;
   /** missingDesc: entity chưa biết vẽ nhân vật nào — xem takeMissingDesc. */
   private readonly missingDesc = new Set<number>();
   private offset: number | null = null;
@@ -134,6 +146,23 @@ export class ClientWorld {
     for (const id of s.ir ?? []) {
       this.items.delete(id);
     }
+    // `Despawn` tường minh (NETCODE_SPEC §4.3) — server GỬI rồi, nhưng client CHƯA xoá
+    // theo nó. Lý do là số đo, không phải e ngại:
+    //
+    // Bật client xoá ngay theo `ds` làm nhấp nháy TỆ ĐI chứ không tốt lên: 8 lần / 15 lượt,
+    // trong khi trước đó 2 lần / 13 lượt. Đo tiếp theo nguyên nhân thì thấy **toàn bộ** số
+    // nhấp nháy đếm được đến từ chính `Despawn` (cột "do Despawn" khớp đúng tổng ở từng lượt).
+    //
+    // Nghĩa là server xoá ĐÚNG LUẬT — người đó thật sự ra ngoài lề 900 quá 2 giây — nhưng
+    // họ quay lại đủ nhanh để mắt người chơi thấy một lần biến mất rồi hiện lại. Xoá đúng
+    // luật vẫn là nhấp nháy.
+    //
+    // Chỗ chữa thật nằm ở Entity Store của Protocol v2 (§4.3): giữ view qua ranh giới
+    // despawn/spawn để lần quay lại không phải dựng lại từ đầu. Làm nửa vời bây giờ — server
+    // xoá, client dựng lại — chỉ đổi một kiểu nhấp nháy lấy một kiểu khác.
+    //
+    // Server vẫn gửi `ds` vì nó đúng và bước sau cần; client đếm để đo, chưa hành động.
+    this.despawnTold += (s.ds ?? []).length;
     const events = s.ev ?? [];
     this.applyObstacleEvents(events);
     this.reconcile(s.ack);
@@ -197,9 +226,12 @@ export class ClientWorld {
         if (left !== undefined) {
           if (now - left < KEEP_GONE_SECS) {
             this.respawn2s++;
+            const why = this.whyGone.get(id) ?? 'hethan';
+            if (why === 'ds') { this.respawnBy.ds++; } else { this.respawnBy.hethan++; }
           }
           this.deletedAt.delete(id);
         }
+        this.whyGone.delete(id);
         this.goneAt.delete(id);
         continue;
       }
@@ -210,6 +242,7 @@ export class ClientWorld {
         m.delete(id);
         this.goneAt.delete(id);
         this.deletedAt.set(id, now);
+        this.whyGone.set(id, 'hethan');
       }
     }
     // Dọn `deletedAt`: entity rời đi quá `KEEP_GONE_SECS` mà chưa quay lại thì có quay lại
@@ -218,6 +251,9 @@ export class ClientWorld {
     for (const [id, at] of this.deletedAt) {
       if (now - at >= KEEP_GONE_SECS) {
         this.deletedAt.delete(id);
+        // Dọn cả `whyGone` theo: entity đi hẳn không bao giờ quay lại thì mục của nó nằm
+        // đó mãi, và một trận dài đi qua hàng nghìn entity.
+        this.whyGone.delete(id);
       }
     }
   }
