@@ -4,6 +4,8 @@
 > Mọi con số nằm trong `config/game.json` (mục 16) — **không hardcode**.
 > Art/animation prompts: `docs/ART_PROMPTS.md`. Hướng dẫn setup: `docs/SETUP_GUIDE.md`.
 
+**Thay đổi v6.2:** va kiếm xét từ vòng ngoài vào cho tới khi đủ 1 vòng đầy (sửa lỗi mài tắc khi vòng ngoài còn kiếm lẻ) (§13.4). NETCODE_SPEC lên v1.1.
+
 **Thay đổi v6.1:** tên bot giống người thật (1 000 tên trong config/bot_names.txt, luật chọn tên & hành vi khi chết, §9.4); hoạt ảnh liền mạch — một thân nhiều khuôn mặt, chuẩn hóa frame tự động, bộ điều khiển anim mượt (§12.5).
 
 **Thay đổi v6.0:** tối ưu mạng/hiệu năng chuyển sang tài liệu riêng `NETCODE_SPEC.md` — đồng bộ theo khu, Room Shared Cache, Protocol v2, cache nhiều lớp, chống nhấp nháy/placeholder (§13.3).
@@ -1019,7 +1021,7 @@ kiem-xoay/
 ### 13.4 Va chạm (server)
 - Lưới không gian (spatial hash) cho thân, quái, item, viên EXP, vật cản. Vật cản tĩnh index sẵn.
 - **Không bao giờ duyệt từng thanh kiếm** để tìm va chạm. Mỗi vòng là 1 vật thể cứng (cùng tốc độ, cùng pha) → tính theo **vòng**: kiểm tra mục tiêu có nằm trong vành khăn của vòng không, rồi tính thẳng chỉ số kiếm gần nhất theo góc (O(1)), cộng cung quét trong tick.
-- Kiếm–kiếm: luật chơi chỉ tính va chạm giữa **vòng ngoài cùng** của mỗi bên (kiếm bể luôn trừ từ vòng ngoài cùng, §5.2) → chỉ xét cặp vòng ngoài cùng của 2 người có vành khăn chồng nhau. Các vòng trong bỏ qua hoàn toàn, kể cả khi hai người đi xuyên vào nhau.
+- Kiếm–kiếm: xét va chạm cho **các vòng ngoài cùng tính từ ngoài vào cho tới khi gộp đủ số kiếm của 1 vòng đầy** (vd vòng ngoài chỉ còn 2 kiếm lẻ thì xét thêm vòng kế trong). Lý do: nếu chỉ xét đúng vòng ngoài cùng, lúc vòng đó còn vài kiếm lẻ thì gần như không chạm được nhau → mài tắc (lỗi gameplay đã phát hiện). Kiếm bể vẫn trừ từ vòng ngoài cùng trước. Các vòng sâu hơn bỏ qua.
 - Kiếm–quái / vật cản / viên EXP: chỉ dùng vòng tròn `reach` để lọc qua lưới, rồi kiểm tra vành khăn.
 - Không cấp phát bộ nhớ mỗi tick (dùng lại slice, `sync.Pool` cho buffer gói tin).
 

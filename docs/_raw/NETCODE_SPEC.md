@@ -1,4 +1,7 @@
-# KIẾM XOAY TU TIÊN — Spec tối ưu: Giao thức client–server & Cache nhiều lớp (v1)
+# KIẾM XOAY TU TIÊN — Spec tối ưu: Giao thức client–server & Cache nhiều lớp (v1.1)
+
+> **v1.2**: §4.6 vị trí người chơi (của mình giữ chính xác cao), §4.9 schema chung + bài đối chiếu mã hóa bắt buộc, ngân sách gói 8 KB tạm thời tới hết bước 3, AOI giữ 2s ở client trước rồi thay bằng `Despawn` ở bước 3.
+> **v1.1** (sau báo cáo `docs/NETCODE_PLAN.md`): sửa nguyên nhân nhấp nháy/placeholder trong §0, đổi thứ tự §8 (bước 2 trước), trần texture theo thiết bị (§5 L1), luật an toàn cho Service Worker (§5 L3).
 
 > Đặt tại `docs/_raw/NETCODE_SPEC.md`. Spec này **thay thế** GAME_SPEC §13.3 (mạng) và bổ sung §13.6 (hiệu năng). Mọi luật chơi vẫn theo GAME_SPEC.
 > Mục tiêu kép: **nhẹ hơn** (băng thông, CPU server, CPU/GPU client) và **đẹp hơn** (không nhấp nháy, không bao giờ thấy hình placeholder khi chơi thật).
@@ -10,8 +13,7 @@
 | Triệu chứng | Nguyên nhân khả dĩ |
 |---|---|
 | Client nhận dữ liệu cả room dù chỉ đứng 1 khu | Room được xử lý như 1 khối; snapshot/sự kiện không tách theo khu |
-| Nhân vật đã vào khung hình vẫn **nhấp nháy** | Entity bị despawn/spawn liên tục khi đứng ở mép vùng AOI; view bị hủy rồi tạo lại |
-| Hiện **hình placeholder** của nhân vật | Atlas nhân vật tải lười (khi entity đầu tiên xuất hiện); texture bị giải phóng rồi tải lại; build thật vẫn bật placeholder |
+| Nhân vật **nhấp nháy** + hiện **placeholder** (cùng 1 lỗi — đã xác nhận bằng đo) | Server cố ý bỏ entity ở xa trên tick lẻ (tối ưu 10 Hz), client hiểu "vắng mặt 1 gói = đã rời đi" nên hủy view → entity xa bị hủy/dựng lại ~10 lần/giây. View dựng lại không có descriptor (tên nhân vật chỉ gửi lần đầu, server không biết client đã hủy) → không tra được atlas → placeholder. Atlas thật ra đã tải đủ trước trận. |
 | Gói tin đỉnh 38 KB | Gửi lại toàn bộ dữ liệu (tên, danh hiệu, nhân vật...) mỗi lần; item dồn 1 gói |
 | Mỗi client tốn CPU server riêng | Mỗi client tự mã hóa lại cùng một entity mỗi tick |
 
@@ -20,7 +22,7 @@
 | Chỉ số | Mục tiêu |
 |---|---|
 | Băng thông xuống / client (đông người) | < 25 KB/s trung bình, < 40 KB/s đỉnh |
-| Gói snapshot lớn nhất | < 6 KB |
+| Gói snapshot lớn nhất | < 6 KB (tạm chấp nhận < 8 KB cho tới khi xong bước 3 — Protocol v2 nhị phân) |
 | Server tick / khu | < 3 ms (p95 < 5 ms) |
 | Khung hình có placeholder (build thật) | **0** |
 | Entity trong khung nhìn bị despawn rồi spawn lại trong 2s | **0** |
@@ -137,7 +139,8 @@
 - Client nghẽn (bộ đệm gửi đầy) → bỏ snapshot cũ chưa gửi, chỉ giữ bản mới nhất + mọi sự kiện quan trọng (Spawn/Despawn/Desc/chiến đấu không bao giờ bị bỏ).
 
 ### 4.6 Lượng tử hóa
-- Vị trí `u16` theo khu (12 000 / 65 535 ≈ 0.18), góc `u8`, scale `u8` (bước 0.02), ring phase `u16`, mood `u4`, buff `u16` bitmask, cờ trạng thái `u16` bitmask.
+- **Vị trí người chơi khác, quái, item**: `u16` theo khu (12 000 / 65 535 ≈ 0.18). **Vị trí của chính mình** (trong `SelfState`, dùng để hiệu chỉnh dự đoán §8.2a GAME_SPEC): giữ độ chính xác cao (`i32` fixed-point 1/256 đơn vị hoặc float32). Sau khi đổi, đo bộ đếm "hiệu chỉnh/giây" — phải giữ ≈ 0.
+- Thang cũ (chưa theo spec): góc `u8`, scale `u8` (bước 0.02), ring phase `u16`, mood `u4`, buff `u16` bitmask, cờ trạng thái `u16` bitmask.
 - Vòng kiếm: chỉ gửi `count, phase, dir, flip_tick` — client tự tính hình học (GAME_SPEC §4.1a).
 
 ### 4.7 Chuyển khu (cổng / Thiên Môn)
@@ -156,6 +159,11 @@ Client A bước vào cổng
 - Thời gian "đang dịch chuyển" kéo dài tới khi client sẵn sàng (tối đa 3s) → không ai chết vì máy tải chậm. Vẫn **không bất tử sau khi đã xuất hiện** (luật GAME_SPEC §8.4 giữ nguyên).
 - Client giữ lại cache khu vừa rời (xem §5 L2) → quay lại khu cũ gần như tức thì.
 
+### 4.9 Một nguồn schema + bài đối chiếu mã hóa (bắt buộc trước khi bật v2)
+- Định nghĩa mọi message đường nóng trong **1 file schema** (vd `proto/schema.yaml`: tên trường, kiểu, thứ tự, bitmask). Một generator sinh ra **cả** bộ mã hóa Go (server) và bộ giải mã TypeScript (client) — không viết tay `DataView` hai phía.
+- **Bài đối chiếu hai chiều** (giống `cmd/collisionfixture`): server sinh tập gói mẫu (golden vectors) + gói ngẫu nhiên (fuzz 10 000 gói), client giải mã, so từng trường; chạy trong CI. Thêm trường `schema_hash` vào `Hello`: lệch là từ chối kết nối (không để đọc rác im lặng).
+- Phải pass bài này **trước** khi bật v2 cho bất kỳ người chơi nào, và trước khi xóa v1.
+
 ### 4.8 Bảng message (tóm tắt)
 C→S: `Hello{proto, build, guest_id}`, `Join`, `Input{seq, angle_u8, flags}` (30 Hz), `Ack{snapshot_seq}` (gộp trong Input), `ZoneReady{zone_id}`, `Skill`, `Ping`.
 S→C (ROOM): `RoomFull`, `RoomDelta`, `RoomEvent`, `MapBlob`, `Pong`.
@@ -172,7 +180,7 @@ S→C (ZONE): `ZoneEnter`, `Spawn`, `Desc`, `Update`(trong `Snapshot`), `Despawn
 ### L1 — GPU / texture
 - **Tải trước bắt buộc** ở màn hình "Đang tìm phòng..." (thanh tiến trình): toàn bộ atlas 10 nhân vật, skin kiếm 14 cảnh giới, item/buff, VFX dùng chung, font BitmapFont. Sau khi tải: **"làm ấm GPU"** — vẽ thử mỗi texture 1 lần ngoài màn hình để upload lên GPU trước khi vào trận.
 - **Không bao giờ giải phóng** atlas nhân vật/kiếm trong trận.
-- **Cache texture vòng kiếm dùng chung**: key `(skin, ring_index, sword_count_in_ring, tilt_dir, scale_bucket, tint)` → 1 `RenderTexture`. Nhiều người cùng cảnh giới/cùng số kiếm dùng chung 1 texture. LRU, trần 96 MB texture vòng kiếm.
+- **Cache texture vòng kiếm dùng chung**: key `(skin, ring_index, sword_count_in_ring, tilt_dir, scale_bucket, tint)` → 1 `RenderTexture`. Nhiều người cùng cảnh giới/cùng số kiếm dùng chung 1 texture. LRU, **trần theo thiết bị / chất lượng**: PC Cao 96 MB · PC Vừa 64 MB · điện thoại 24 MB (Thấp 16 MB). Kích thước texture vòng giới hạn theo kích thước hiển thị thực (điện thoại tối đa 1024 px). Đầy trần → hạ `scale_bucket` (texture nhỏ hơn) trước khi loại bỏ.
 - Cache texture nameplate: key `(name, title_id, realm, tầng, rank, is_self)`.
 
 ### L2 — RAM
@@ -181,12 +189,19 @@ S→C (ZONE): `ZoneEnter`, `Spawn`, `Desc`, `Update`(trong `Snapshot`), `Despawn
 
 ### L3 — Bền (trình duyệt)
 - **Service Worker + Cache Storage** cho asset: tên file có hash nội dung (`a_hon.3f9c2e.png`), header `Cache-Control: immutable`. Lần chơi sau không tải lại.
+- **Luật an toàn Service Worker** (tránh lặp lại sự cố build cũ làm game đứng hình 29/10):
+  - Chỉ cache **file có hash trong tên** (cache-first). `index.html`, `asset-manifest.json`, file JS/CSS chính luôn **network-first**, không bao giờ phục vụ bản cũ khi có mạng.
+  - SW mới **không** tự `skipWaiting` giữa trận: kiểm tra `build_version` lúc mở game; lệch → hiện "Có bản mới — tải lại" ở trang chủ (không ngắt trận đang chơi).
+  - Server từ chối `Hello` có `build` / `proto` cũ → client tự tải lại.
+  - **Công tắc khẩn cấp**: endpoint `/sw-kill` + file `sw.js` có cờ `disabled` → SW tự hủy đăng ký và xóa cache. Có test trong browsertest: build A → build B, client không đứng hình.
+  - Bước 7 chỉ bật SW sau khi qua test trên.
 - **IndexedDB** cho map blob theo `map_hash` (giữ 20 bản gần nhất) → vào lại khu cũ/room có cùng seed không cần tải.
 - `asset-manifest.json` (có hash) tải mỗi lần mở game để biết cái gì đổi.
 
 ### Hiển thị — không nhấp nháy, không placeholder
 1. **Build thật cấm placeholder**: placeholder chỉ bật với `?debug=true`. Asset thiếu trong build thật → dùng **nhân vật dự phòng có art thật** (1 nhân vật mặc định) và ghi log; CI chặn build nếu `assets:report` còn thiếu asset bắt buộc.
-2. Entity chỉ được vẽ khi **descriptor + atlas đã sẵn sàng** (vì đã tải trước nên luôn sẵn sàng).
+2. Entity chỉ được vẽ khi **descriptor + atlas đã sẵn sàng**. Thiếu descriptor (vì bất kỳ lý do gì) → client gửi `DescRequest{id}` và **giữ hình cũ / chưa hiện** chứ không vẽ placeholder.
+2b. **Vắng mặt trong snapshot KHÔNG BAO GIỜ có nghĩa là đã rời đi.** Chỉ hủy (đưa về pool) khi nhận `Despawn` rõ ràng, hoặc không nhận bất kỳ cập nhật nào của entity đó quá **2s** (dự phòng). Entity đang được cập nhật ở 5/10 Hz là chuyện bình thường.
 3. **Nội suy thích ứng**: bộ đệm 100 ms, tự tăng tới 200 ms khi jitter cao; thiếu dữ liệu → ngoại suy tối đa 100 ms rồi đứng yên; tuyệt đối không "nhảy" trừ khi là dịch chuyển thật.
 4. Vào khung hình: nhân vật **mờ dần vào** 120 ms (không bật đột ngột); rời: mờ dần ra 150 ms rồi mới về pool.
 5. Đổi descriptor (đổi danh hiệu, cảnh giới): đổi tại chỗ có hiệu ứng, không tạo lại view.
@@ -210,12 +225,12 @@ S→C (ZONE): `ZoneEnter`, `Spawn`, `Desc`, `Update`(trong `Snapshot`), `Despawn
 - [ ] Mất mạng 5s rồi nối lại: nhận đúng phần Room Cache thiếu, khu hiện tại đồng bộ lại bằng keyframe, không phải vào trận lại.
 - [ ] Vào trận lần 2: không tải lại asset (Service Worker), < 2 s.
 
-## 8. Thứ tự triển khai (mỗi bước đo trước/sau, ghi PROGRESS.md)
-1. **Tách khu cho mạng**: kênh ROOM/ZONE, client chỉ nhận khu đang đứng, Room Shared Cache (L2 server).
-2. **Chống nhấp nháy & placeholder** (ưu tiên vì ảnh hưởng hình ảnh nhất): tải trước + làm ấm GPU, View Pool, AOI có trễ + giữ 2s, mờ vào/ra, cấm placeholder ở build thật.
-3. **Vòng đời entity + descriptor cache + delta theo ack + keyframe** (Protocol v2 đường nóng nhị phân). Giữ Protocol v1 song song sau cờ `proto=1` cho tới khi v2 ổn.
+## 8. Thứ tự triển khai (v1.1 — mỗi bước đo trước/sau, ghi PERF_LOG)
+1. **Chống nhấp nháy & placeholder** (vá rẻ trước, không cần Protocol v2; giữ 2s hoàn toàn ở client — bước 3 sẽ thay bằng `Despawn` tường minh từ server): client chỉ hủy entity khi có `Despawn` hoặc im lặng > 2s (§5 mục 2b); `DescRequest` khi thiếu descriptor; không vẽ placeholder ở build thật; mờ vào/ra; View Pool. Đo lại với **nhiều người chơi + bot di chuyển quanh mép khung nhìn** (không đo khi đứng một mình).
+2. **Room Shared Cache** (phần còn thiếu của "tách khu" — client đã không nhận entity khu khác từ bản 5 khu). Kiểm chứng bằng log gói rằng không còn dữ liệu chéo khu.
+3. **Vòng đời entity + descriptor cache + delta theo ack + keyframe** (Protocol v2 đường nóng) — làm schema + generator + bài đối chiếu (§4.9) **trước**, rồi mới tới message. v1 song song sau cờ `proto=1`. Đổi lượng tử hóa theo §4.6 và đo bộ đếm hiệu chỉnh.
 4. **Encode once / gói theo ô lưới** (L1 server).
 5. **Chuyển khu có ZoneReady**, cache map blob (IndexedDB), cache 2 khu trong RAM.
-6. **Net Web Worker**, texture vòng kiếm dùng chung, nameplate cache.
-7. **Service Worker + asset có hash**.
+6. **Net Web Worker**, texture vòng kiếm dùng chung (trần theo thiết bị), nameplate cache.
+7. **Service Worker + asset có hash** — chỉ sau khi qua test an toàn §5 L3.
 8. Chạy lại toàn bộ bài kiểm tra §7, gửi bảng tổng kết.

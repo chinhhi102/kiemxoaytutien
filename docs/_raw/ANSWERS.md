@@ -198,3 +198,34 @@ Anh thấy chém người cấp Tiên không có Tiên khí rơi ra. Spec §3.4 
 2. Luật đúng (spec v5.9 §3.4): **luôn** rơi `floor(30% × loss_tiên_khí)` thành viên Tiên khí quanh nạn nhân, **bất kể người chém là phàm/Tiên/bot**, kể cả Chân Tiên rớt về Đại Thừa (loss = toàn bộ Tiên khí). Chia viên 10 → 2 → 1, văng bán kính 200–500, tồn tại 60s, có hiệu ứng nổ vàng + SFX.
 3. Viên Tiên khí **không bị loại bởi LOD/AOI "viên nhỏ"** (mục 27) — Tiên khí luôn được gửi khi trong khung nhìn.
 4. Test: Chân Tiên 80 bị chém → rơi tổng 24; Thái Ất 450 → Kim Tiên, rơi 104; người chém phàm vẫn làm rơi đủ.
+
+---
+
+## Trả lời báo cáo tối ưu 25–27 & NETCODE_PLAN
+
+**Tối ưu 26–27: ĐẠT, chấp nhận.** Ghi vào PERF_LOG (lượt mới, kèm bảng mổ gói theo trường: 82% ItemPicked). Luật va kiếm "từ vòng ngoài vào cho tới khi đủ 1 vòng đầy" — **chấp nhận**, đã ghi vào GAME_SPEC v6.2 §13.4. Cảm ơn vì không sửa test cho qua.
+
+**NETCODE — duyệt đổi thứ tự (NETCODE_SPEC v1.1 §8):**
+1. Làm **chống nhấp nháy & placeholder trước** bằng bản vá rẻ: client chỉ hủy entity khi có `Despawn` hoặc im lặng > 2s; thêm `DescRequest` khi thiếu descriptor; không bao giờ vẽ placeholder ở build thật. Đo với nhiều người + bot quanh mép khung nhìn. Gửi tôi số "biến mất rồi quay lại trong 2s" và "% nhân vật vẽ placeholder" trước/sau.
+2. Bước "tách khu" thu nhỏ thành **Room Shared Cache** + kiểm chứng log gói.
+
+**3 điểm em nêu:**
+- Bước 1 nhỏ hơn spec tưởng → đồng ý, đã gộp như trên.
+- Trần 96 MB quá nhiều cho điện thoại → spec v1.1: PC Cao 96 / PC Vừa 64 / điện thoại 24 (Thấp 16) MB; texture vòng điện thoại tối đa 1024 px; đầy trần thì hạ độ phân giải trước khi loại bỏ.
+- Bẫy Service Worker → spec v1.1 §5 L3 thêm luật an toàn: chỉ cache file có hash; index/manifest/JS chính network-first; không skipWaiting giữa trận; server từ chối build cũ; công tắc `/sw-kill`; test build A → B không đứng hình. Bước 7 chỉ làm sau khi qua test này.
+
+**4 điểm còn lại trong NETCODE_PLAN** (anh chưa dán cho tôi): ghi rõ phương án em đề xuất cho từng điểm vào QUESTIONS.md, tôi sẽ trả lời. Trong lúc chờ, làm bước 1 (không phụ thuộc 4 điểm đó).
+
+---
+
+## Trả lời NETCODE_PLAN (c) — đủ 7 điểm
+
+1. Bước 1 nhỏ hơn → **đồng ý**, đã thu thành Room Shared Cache (spec v1.1 §8 bước 2).
+2. Lượng tử hóa vị trí → **đồng ý theo hướng em**: người khác/quái/item dùng `u16` thang 0,18 (đúng spec); **vị trí của chính mình** trong `SelfState` giữ chính xác cao (fixed-point 1/256 hoặc float32). Đổi ở bước 3, đo bộ đếm hiệu chỉnh phải ≈ 0. (spec v1.2 §4.6)
+3. Ngân sách 6 KB → **tạm chấp nhận < 8 KB** cho tới hết bước 3; sau Protocol v2 phải về < 6 KB. (spec v1.2 §1)
+4. Trần texture → đã sửa spec v1.1: PC 96/64, điện thoại 24 (Thấp 16) MB.
+5. Service Worker → đã sửa spec v1.1 §5 L3 (manifest/index network-first, giữ cổng chặn version, `/sw-kill`, test build A→B).
+6. Bài đối chiếu trước khi xóa v1 → **đồng ý và nâng lên bắt buộc trước khi bật v2 cho bất kỳ ai**. Thêm: dùng **1 file schema** + generator sinh cả mã hóa Go lẫn giải mã TS (không viết tay DataView hai phía), golden vectors + fuzz 10 000 gói trong CI, `schema_hash` trong `Hello` lệch thì từ chối. (spec v1.2 §4.9)
+7. AOI giữ 2s → **đồng ý**: bản rẻ ở client trước, bước 3 thay bằng `Despawn` tường minh. (spec v1.2 §8)
+
+Kế hoạch (b) **duyệt**. Bắt đầu Bước 2a → 2b ngay. Bài đo `flicker.mjs` phải có bot đi qua lại mép khung nhìn 30s (như em đã lưu ý), ghi trước/sau vào PERF_LOG.

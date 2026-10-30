@@ -46,3 +46,7 @@ Người sở hữu dự án KHÔNG rành setup kỹ thuật → giải thích n
     kỹ năng…) — cập nhật `docs/PERF_LOG.md` (bảng §3, chi tiết §5, nút thắt §6) và
     `docs/perf_log.csv`, theo đúng kịch bản chuẩn S1–S5. **Đo trước rồi mới sửa**; nút thắt
     phải có số đo làm bằng chứng, không ghi phỏng đoán. Chỉ so các lần đo CÙNG kịch bản.
+
+> **Bản `CLAUDE.md` trong repo là bản chuẩn.** Bản Claude gửi trong chat (hoặc đặt ở
+> `docs/_raw/CLAUDE.md`) chỉ để tham khảo DÒNG MỚI — không chép đè, vì bản chat thường
+> là nhánh cũ hơn và sẽ xoá mất các quy tắc đã chốt sau đó.
