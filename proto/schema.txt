@@ -1,0 +1,96 @@
+# Nguồn SỰ THẬT DUY NHẤT cho mọi message đường nóng — NETCODE_SPEC §4.9.
+#
+# Vì sao bắt buộc có file này TRƯỚC khi bật Protocol v2: mã hoá nhị phân viết tay ở hai phía
+# là hai bản dịch của cùng một tài liệu, và chúng lệch nhau TRONG IM LẶNG. Client đọc lệch
+# một byte thì không có lỗi nào được ném ra — nó chỉ đọc rác, rồi nhân vật nhảy lung tung
+# hoặc màn hình đứng. Đã dính đúng một lần với trường `mood` (xem netproto.ProtocolVersion).
+#
+# `cd server && go run ./cmd/protogen` đọc file này và sinh ra:
+#   server/internal/wire/wire_gen.go   (Go: mã hoá + giải mã)
+#   client/src/net/wire.gen.ts         (TypeScript: giải mã + mã hoá)
+# ĐỪNG sửa tay hai file đó — sửa ở đây rồi chạy lại generator.
+#
+# ── Cách viết ───────────────────────────────────────────────────────────────────────────
+#   message <Tên> <id>      bắt đầu một message; `id` đi vào byte đầu của gói
+#   doc <câu>               mô tả, viết bao nhiêu dòng `doc` cũng được
+#   <tên> <kiểu>            một trường
+#   <tên> <kiểu> bitmask a,b,c    trường này là bitmask điều khiển các trường a, b, c
+#   <tên> <kiểu> if a             trường này CHỈ có mặt khi bit `a` bật
+#
+# Kiểu: u8 u16 u32 i8 i16 i32 f32 str
+#   str = 1 byte độ dài + UTF-8 (tối đa 255 byte)
+#   mọi số nguyên là little-endian
+#
+# ⚠ `id` của message và THỨ TỰ các trường là một phần của giao thức. Đổi chúng khi đã có
+#   người chơi đang kết nối nghĩa là mọi client cũ đọc sai. Thêm trường mới vào CUỐI.
+
+version 2
+
+message Spawn 1
+  doc Entity vào vùng quan tâm lần đầu, hoặc quay lại sau khi đã Despawn (§4.3).
+  doc Chở ĐỦ descriptor + state nên client dựng được ngay, không phải hỏi thêm.
+  id          u32
+  desc_ver    u16     # phiên bản descriptor; đổi thì server gửi Desc
+  name        str
+  char        u8      # chỉ số trong config.characters
+  title       u8
+  x           u16     # lượng tử theo khu: 12000/65535 ≈ 0.18 đơn vị (§4.6)
+  y           u16
+  facing      u8      # góc 0..255 ứng với 0..2π
+  level       u8
+  scale       u8      # bước 0.02
+  swords      u16
+  ring_phase  u16
+  ring_dir    i8
+  mood        u8
+  buffs       u16     # bitmask buff
+  flags       u16     # bitmask cờ trạng thái
+
+message Desc 2
+  doc Descriptor đổi (danh hiệu, cảnh giới, skin) — đổi TẠI CHỖ, không dựng lại view (§5.5).
+  id          u32
+  desc_ver    u16
+  name        str
+  char        u8
+  title       u8
+
+message Update 3
+  doc Delta mỗi snapshot: chỉ chở trường ĐÃ ĐỔI so với bản client đã ack (§4.3).
+  doc Đây là chỗ tiết kiệm băng thông lớn nhất — đứng yên thì gói gần như rỗng.
+  id          u32
+  changed     u16     bitmask x,y,facing,level,scale,swords,ring_phase,ring_dir,mood,buffs,flags
+  x           u16     if x
+  y           u16     if y
+  facing      u8      if facing
+  level       u8      if level
+  scale       u8      if scale
+  swords      u16     if swords
+  ring_phase  u16     if ring_phase
+  ring_dir    i8      if ring_dir
+  mood        u8      if mood
+  buffs       u16     if buffs
+  flags       u16     if flags
+
+message Despawn 4
+  doc Entity rời đi THẬT SỰ — thứ bước 2b còn thiếu.
+  doc Không có message này thì client phải đoán bằng cách đợi 2 giây im lặng, nên không bao
+  doc giờ phân biệt được "vắng mặt vì AOI" với "đã đi mất".
+  doc reason: 0 out_of_view · 1 died · 2 teleported · 3 left
+  id          u32
+  reason      u8
+
+message SelfState 5
+  doc Trạng thái của CHÍNH MÌNH, giữ độ chính xác cao (§4.6).
+  doc Vị trí người khác lượng tử về u16 thì không ai thấy; vị trí của chính mình dùng để
+  doc hiệu chỉnh dự đoán (GAME_SPEC §8.2a) nên sai số lượng tử ở đây biến thành giật.
+  ack_seq     u32     # input cuối server đã xử lý
+  x           i32     # fixed-point 1/256 đơn vị
+  y           i32
+  vx          i32
+  vy          i32
+
+message Input 6
+  doc Client → server, 30 lần/giây. Không có trường nào thừa.
+  seq         u32
+  angle       u8
+  buttons     u8      # bit0 moving · bit1 burn · bit2 skill

@@ -799,3 +799,43 @@ server ở **bước 3**.
 - 5 tile vẫn sót nền magenta sau 2 lượt sinh lại (đã vá tạm bằng màu trung bình).
 - **Lưu ý khi commit**: dùng `git commit -F <file>` thay vì `-m "..."` — dấu backtick trong
   message bị shell diễn giải, commit `9bca2c9` mất vài từ vì lỗi này.
+
+## Phiên 30/10 (chiều, tiếp 3) — NETCODE bước 3: nền tảng Protocol v2 (§4.9)
+
+Spec bắt buộc làm §4.9 **trước** khi chạm vào message. Đã xong phần nền đó.
+
+### Một nguồn schema + generator hai phía
+`proto/schema.txt` là nguồn sự thật duy nhất. `cd server && go run ./cmd/protogen` sinh ra
+**cả hai**: `server/internal/wire/wire_gen.go` và `client/src/net/wire.gen.ts`. Không ai viết
+`DataView` bằng tay nữa.
+
+Định dạng dòng tự viết thay vì YAML: dự án có luật không thêm thư viện khi chưa hỏi, spec chỉ
+nói "vd schema.yaml" chứ không chỉ đích danh thư viện. Định dạng này còn dễ đọc hơn YAML.
+
+6 message theo §4.3: `Spawn` `Desc` `Update` `Despawn` `SelfState` `Input`.
+`Update` dùng bitmask — entity đứng yên thì gói chỉ còn **6 byte**.
+
+### Bài đối chiếu hai chiều
+```
+cd server && go run ./cmd/protofixture -o /tmp/wire.json
+cd client && npm run check:wire -- /tmp/wire.json
+```
+**10 015 gói** (15 golden nhắm vào biên + 10 000 fuzz seed cố định), kiểm **hai chiều**:
+client giải mã byte của server rồi mã hoá ngược lại, so từng byte. Hiện **khớp hết**.
+
+Đã kiểm chính bài kiểm: đổi 1 byte trong fixture → báo đúng gói, đúng trường, thoát mã 1.
+
+### `schema_hash` chống đọc rác
+Băm nội dung schema nhúng vào cả hai phía. Lệch là từ chối, thay vì đọc rác im lặng — đúng
+lỗi đã dính một lần với trường `mood`.
+
+### CI
+Thêm 2 bước: sinh lại từ schema rồi `git diff --exit-code` (ai sửa schema mà quên chạy
+generator thì CI đỏ), và chạy bài đối chiếu với fixture **sinh tươi** mỗi lần.
+
+### Còn lại của bước 3
+Phần nền xong, chưa động vào đường truyền thật:
+- Vòng đời `Spawn/Desc/Update/Despawn` tường minh ở server (đây mới là thứ đóng nốt respawn).
+- Delta theo ack + keyframe 2s.
+- Lượng tử hoá §4.6 (vị trí mình giữ i32 fixed-point, người khác u16).
+- Bật v2 sau cờ `proto=2`, v1 chạy song song.

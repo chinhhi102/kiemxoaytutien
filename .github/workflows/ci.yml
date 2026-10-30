@@ -4,6 +4,7 @@
 #   - check:assets       → ngày 30/10 đội test chơi bản có 12 khung placeholder (NETCODE §5.1)
 #   - check:items        → Bí Kíp hiện ra vòng tròn trắng vì tra nhầm thư mục art
 #   - check:telemetry-off→ bản release không được đóng gói module telemetry (TELEMETRY §1.6)
+#   - check:wire         → mã hoá nhị phân hai phía phải khớp từng byte (NETCODE §4.9)
 #   - go test -race      → 6 lỗi tranh chấp dữ liệu giữa các goroutine khu đã bắt được
 name: CI
 
@@ -29,11 +30,26 @@ jobs:
       - name: go test -race
         working-directory: server
         run: go test -race ./...
+      # Sinh lại từ schema rồi kiểm KHÔNG có gì đổi. Ai sửa `proto/schema.txt` mà quên chạy
+      # generator thì code sinh ra và schema lệch nhau — và lệch kiểu đó không làm hỏng build,
+      # nó chỉ làm client đọc rác lúc chạy.
+      - name: code sinh từ schema còn khớp
+        working-directory: server
+        run: |
+          go run ./cmd/protogen
+          git diff --exit-code -- internal/wire/wire_gen.go ../client/src/net/wire.gen.ts
+
 
   client:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Job này cần Go: gói mẫu đối chiếu do server sinh ra, và phải sinh TƯƠI mỗi lần chạy
+      # chứ không dùng file commit sẵn — file commit sẵn sẽ cũ đi mà không ai biết.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -50,6 +66,14 @@ jobs:
       - name: mọi loại vật phẩm có ảnh
         working-directory: client
         run: npm run check:items
+      # Đối chiếu mã hoá hai phía: client giải mã gói server tạo ra, so từng trường, rồi mã
+      # hoá ngược lại và so từng byte (NETCODE_SPEC §4.9).
+      - name: sinh gói mẫu (Go)
+        working-directory: server
+        run: go run ./cmd/protofixture -o /tmp/wire.json
+      - name: client giải mã khớp server
+        working-directory: client
+        run: npm run check:wire -- /tmp/wire.json
       - name: build (tsc + vite)
         working-directory: client
         run: npm run build
