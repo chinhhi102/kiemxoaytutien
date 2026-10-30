@@ -212,9 +212,14 @@ func animOf(file string) (string, bool) {
 }
 
 // buildJitter chấm điểm mọi animation của mọi nhân vật và quái, ghi assets/_raw/jitter.json.
-func buildJitter(assets string) (*JitterReport, error) {
-	dirs, _ := filepath.Glob(filepath.Join(assets, "characters", "*", "frames"))
-	more, _ := filepath.Glob(filepath.Join(assets, "monsters", "*", "frames"))
+//
+// `sub` chọn thư mục frame: "frames" (gốc) hay "frames_norm" (đã chuẩn hoá). Có hai lựa chọn
+// để so ĐƯỢC trước/sau — không so được thì không biết chuẩn hoá có tác dụng hay không.
+func buildJitter(assets string) (*JitterReport, error) { return buildJitterIn(assets, "frames", true) }
+
+func buildJitterIn(assets, sub string, write bool) (*JitterReport, error) {
+	dirs, _ := filepath.Glob(filepath.Join(assets, "characters", "*", sub))
+	more, _ := filepath.Glob(filepath.Join(assets, "monsters", "*", sub))
 	rep := &JitterReport{Threshold: jitterRed}
 	for _, dir := range append(dirs, more...) {
 		char := filepath.Base(filepath.Dir(dir))
@@ -266,6 +271,9 @@ func buildJitter(assets string) (*JitterReport, error) {
 		}
 		return rep.Anims[i].Char+rep.Anims[i].Anim < rep.Anims[j].Char+rep.Anims[j].Anim
 	})
+	if !write {
+		return rep, nil
+	}
 	// Bản ĐẦY ĐỦ vào `_raw` (thư mục nháp, server KHÔNG phục vụ ra ngoài): có từng cặp frame,
 	// dùng khi ngồi soi một animation cụ thể.
 	full, err := json.MarshalIndent(rep, "", " ")
@@ -298,6 +306,15 @@ func buildJitter(assets string) (*JitterReport, error) {
 }
 
 func round1(v float64) float64 { return math.Round(v*10) / 10 }
+
+// writeJitterTo ghi báo cáo ra một đường dẫn tuỳ ý (dùng cho bản sau chuẩn hoá).
+func writeJitterTo(assets, rel string, rep *JitterReport) error {
+	b, err := json.MarshalIndent(rep, "", " ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(assets, filepath.FromSlash(rel)), b, 0o644)
+}
 
 func sortedAnimNames(m map[string][]string) []string {
 	out := make([]string, 0, len(m))

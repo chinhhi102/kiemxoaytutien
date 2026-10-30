@@ -30,3 +30,8 @@ assets/_raw/
 tools/browsertest/node_modules
 docs/perf/*.png
 deploy/.build/
+
+# Frame đã chuẩn hoá (`artgen normalize` / `tools/atlas-pack`): 115 MB sản phẩm TRUNG GIAN.
+# Game chỉ dùng `atlas.png`, không đọc thư mục này; và nó sinh lại được từ `frames/` bằng
+# một lệnh. Commit vào là gấp đôi dung lượng repo để lưu thứ máy tự dựng lại trong 2 phút.
+frames_norm/

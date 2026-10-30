@@ -227,6 +227,7 @@ func prepSheet(img *image.NRGBA, j Job, assets string) error {
 	}
 	scales := sharedScales(j, frames)
 	warnFrameCount(j, frames)
+	warnFrameSizes(j, frames)
 	for si, sg := range j.Segs {
 		clearStaleFrames(filepath.Join(assets, sg.Out), sg)
 		for f, fr := range frames[si] {
@@ -385,6 +386,57 @@ var miscut = map[string]bool{}
 // "không cảnh báo" là "đã lành" thì sheet hỏng sẽ lặng lẽ rơi khỏi ART_JOBS.md trong khi
 // atlas vẫn giữ 22 khung sai. Đã dính đúng lỗi này một lần.
 var prepped = map[string]bool{}
+
+// tinyFrameFrac: frame nhỏ hơn ngần này so với frame TRUNG VỊ của cùng animation là mảnh vụn,
+// không phải một khung hình.
+const tinyFrameFrac = 0.2
+
+// warnFrameSizes bắt những sheet cắt ra ĐÚNG SỐ FRAME nhưng frame rỗng ruột.
+//
+// Vì sao cần, dù đã có warnFrameCount: cái kia chỉ ĐẾM. `co_ba_ganh` idle cắt ra đúng 4 frame
+// nên nó cho qua — nhưng thực tế là **1 frame chứa cả bốn nhân vật, 3 frame còn lại là mảnh
+// vụn cao 5–12 px**. Trong game thành nhân vật nhấp nháy giữa một hình đầy đủ và ba khoảng
+// trống, và bảng điểm độ giật chấm nó 77.8 — cao nhất toàn bộ art — mà không ai biết vì sao.
+//
+// So với TRUNG VỊ của chính animation chứ không so với một ngưỡng tuyệt đối: nhân vật to nhỏ
+// khác nhau, và `death` có frame cuối chỉ còn vài đốm sáng là chuyện bình thường.
+func warnFrameSizes(j Job, frames [][]*image.NRGBA) {
+	for si, sg := range j.Segs {
+		if si >= len(frames) || len(frames[si]) < 3 {
+			continue
+		}
+		areas := make([]float64, 0, len(frames[si]))
+		for _, fr := range frames[si] {
+			areas = append(areas, float64(opaqueArea(fr)))
+		}
+		med := medianOf(areas)
+		if med <= 0 {
+			continue
+		}
+		bad := 0
+		for i, a := range areas {
+			if a < med*tinyFrameFrac {
+				bad++
+				log.Printf("  HỎNG %s/%s khung %d: chỉ %.0f%% diện tích so với khung trung vị — cắt hụt",
+					j.Name, sg.Anim, i, a/med*100)
+			}
+		}
+		if bad > 0 {
+			miscut[j.Name] = true
+		}
+	}
+}
+
+// opaqueArea đếm điểm ảnh không trong suốt.
+func opaqueArea(im *image.NRGBA) int {
+	n := 0
+	for i := 3; i < len(im.Pix); i += 4 {
+		if im.Pix[i] >= normAlphaMin {
+			n++
+		}
+	}
+	return n
+}
 
 func warnFrameCount(j Job, frames [][]*image.NRGBA) {
 	for si, sg := range j.Segs {

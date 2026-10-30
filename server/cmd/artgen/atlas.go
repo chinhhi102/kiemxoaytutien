@@ -63,11 +63,23 @@ func buildAtlases(assets string) error {
 	dirs, _ := filepath.Glob(filepath.Join(assets, "characters", "*", "frames"))
 	more, _ := filepath.Glob(filepath.Join(assets, "monsters", "*", "frames"))
 	for _, d := range append(dirs, more...) {
+		// Ưu tiên frame ĐÃ CHUẨN HOÁ nếu có (GAME_SPEC §12.5 B: chuẩn hoá chạy TRƯỚC khi
+		// ghép atlas). Không có thì dùng frame gốc, nên repo chưa chạy `normalize` vẫn ghép
+		// được atlas như cũ.
+		if n := filepath.Join(filepath.Dir(d), "frames_norm"); dirHasPNG(n) {
+			d = n
+		}
 		if err := buildAtlas(d); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// dirHasPNG: thư mục có tồn tại và có ít nhất một ảnh.
+func dirHasPNG(dir string) bool {
+	m, _ := filepath.Glob(filepath.Join(dir, "*.png"))
+	return len(m) > 0
 }
 
 func buildAtlas(framesDir string) error {
@@ -120,7 +132,10 @@ func writeManifest(assets string) error {
 		}
 		rel, _ := filepath.Rel(assets, p)
 		rel = filepath.ToSlash(rel)
-		if d.IsDir() && (rel == "_raw" || d.Name() == "frames") {
+		// Bỏ qua CẢ `frames` lẫn `frames_norm`: đó là ảnh nguồn, game chỉ dùng `atlas.png`.
+		// Quên `frames_norm` ở đây là thêm ~900 ảnh 512 px vào manifest, client preload hết,
+		// và bộ nhớ texture vừa cắt từ 607 MB xuống 378 MB sẽ vọt lại ngay.
+		if d.IsDir() && (rel == "_raw" || d.Name() == "frames" || d.Name() == "frames_norm") {
 			return filepath.SkipDir
 		}
 		if !d.IsDir() && (strings.HasSuffix(rel, ".png") || strings.HasSuffix(rel, ".json") ||

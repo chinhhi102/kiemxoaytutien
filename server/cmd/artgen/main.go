@@ -25,7 +25,7 @@ const pollEvery = 6 * time.Second
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: artgen plan|run|prep|jitter|prompts|status [flags]")
+		fmt.Println("usage: artgen plan|run|prep|normalize|jitter|preview|prompts|status [flags]")
 		os.Exit(2)
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
@@ -34,6 +34,9 @@ func main() {
 	maxPri := fs.Int("p", 9, "only jobs with priority <= p")
 	only := fs.String("only", "", "only jobs whose name contains this text (comma separated)")
 	redo := fs.Bool("redo", false, "regenerate even if the raw image exists")
+	// `jitter -norm`: chấm điểm trên `frames_norm/` thay vì `frames/`, để so ĐƯỢC trước/sau
+	// chuẩn hoá. Không so được thì không biết chuẩn hoá có tác dụng hay chỉ làm cho vui.
+	norm := fs.Bool("norm", false, "jitter: chấm trên frames_norm/ thay vì frames/")
 	limit := fs.Int("n", 60, "max images to generate this run (minigen allows ~60-100 per 5 hours)")
 	_ = fs.Parse(os.Args[2:])
 
@@ -59,13 +62,35 @@ func main() {
 		run(mg, jobs, assets, runOpts{conc: *conc, gap: *gap, redo: *redo, limit: *limit})
 	case "prep":
 		prepAll(jobs, assets)
+	case "normalize":
+		// GAME_SPEC §12.5 B.1–3. Ghi ra `frames_norm/`, KHÔNG đè `frames/`: chuẩn hoá là
+		// phép đoán, phải luôn quay về gốc được để so và để chạy lại khi sửa luật.
+		stats, err := buildNormalized(assets)
+		if err != nil {
+			log.Fatal(err)
+		}
+		printNorm(stats)
+	case "preview":
+		// GIF + onion-skin để duyệt bằng mắt (GAME_SPEC §12.5 B.6).
+		if err := buildPreview(assets, *only, filepath.Join(filepath.Dir(assets), "docs", "anim_preview")); err != nil {
+			log.Fatal(err)
+		}
 	case "jitter":
 		// Chấm điểm độ giật cho mọi animation (GAME_SPEC §12.5 B.5). Tách thành lệnh riêng
 		// chứ không gộp vào `prep`: `prep` phải chạy nhanh sau mỗi lần thả ảnh mới, còn
 		// chấm điểm thì đọc lại toàn bộ ~900 frame.
-		rep, err := buildJitter(assets)
+		sub := "frames"
+		if *norm {
+			sub = "frames_norm"
+		}
+		rep, err := buildJitterIn(assets, sub, !*norm)
 		if err != nil {
 			log.Fatal(err)
+		}
+		if *norm {
+			if err := writeJitterTo(assets, "_raw/jitter_norm.json", rep); err != nil {
+				log.Fatal(err)
+			}
 		}
 		printJitter(rep, 0)
 	case "prompts":
