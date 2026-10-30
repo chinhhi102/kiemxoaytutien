@@ -4,6 +4,8 @@
 > Mọi con số nằm trong `config/game.json` (mục 16) — **không hardcode**.
 > Art/animation prompts: `docs/ART_PROMPTS.md`. Hướng dẫn setup: `docs/SETUP_GUIDE.md`.
 
+**Thay đổi v6.0:** tối ưu mạng/hiệu năng chuyển sang tài liệu riêng `NETCODE_SPEC.md` — đồng bộ theo khu, Room Shared Cache, Protocol v2, cache nhiều lớp, chống nhấp nháy/placeholder (§13.3).
+
 **Thay đổi v5.9:** làm rõ: chém người Tiên giới luôn rơi 30% Tiên khí mất ra đất, bất kể người chém là ai (§3.4).
 
 **Thay đổi v5.8:** bị chém rớt 1 đại cảnh giới và thanh về **mức sàn** (tầng 1, 0%) của cảnh giới mới, không giữ tầng nữa (§5.1, §3.4).
@@ -954,6 +956,9 @@ kiem-xoay/
 ```
 
 ### 13.3 Mạng
+
+> **Đã được thay thế bởi `NETCODE_SPEC.md` (Protocol v2, cache nhiều lớp, đồng bộ theo khu).** Nội dung dưới đây chỉ giữ để tham khảo; chỗ nào mâu thuẫn thì theo NETCODE_SPEC.
+
 - Tick server 30 Hz, mỗi phòng 1 goroutine. Snapshot gửi client 20 Hz.
 - Client → Server: `Join{name, character, guest_id}`, `Input{seq, angle_u8, moving}` (30 Hz), `Ping`.
 - Server → Client: `Welcome`, `Snapshot`, `Event`, `Leaderboard` (1 Hz).

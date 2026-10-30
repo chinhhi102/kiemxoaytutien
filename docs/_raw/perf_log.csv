@@ -1,0 +1,6 @@
+run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_peak,pkt_max_kb,ping_p95_ms,fps_avg,fps_low1,draw_ms,draw_calls,sprites,tex_mb,placeholder_frames,respawn_per_min,zone_switch_cached_ms,zone_switch_cold_ms,deaths_per_bot_5min,notes
+0,,,"Mốc trước tối ưu",S1,11.45,19.89,,43.1,,38.3,,,,,,,,,,,,,"ItemsAdded dồn 1 gói"
+0b,,,"Mốc trước tối ưu - game thật 9 người",S4*,3.40,,,61.7,,3.0,,60,,1.0,245,2413,,,,,,,"đo trước chuẩn hóa"
+1,,,"v4.9 bản đồ - bản đầu",S4*,,,,,,,,36,,,611,,,,,,,,"Graphics riêng từng decal"
+2,,,"v4.9 bản đồ - bake chunk",S4*,,,,,,,,58,,0.9,118,,,,,,,,"draw call 611->118"
+3,,,"Sửa SegSegDist2",S5,,,,,,,,,,,,,,,,,,2.10,"304->84 lượt chết/5 phút"
