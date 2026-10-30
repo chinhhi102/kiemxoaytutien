@@ -653,3 +653,69 @@ lỗi sản phẩm cũng không phải lỗi test**: tôi sửa `config/game.jso
 lúc test đang build, nên test đọc phải file viết dở (thiếu `pickup_r` → vòng nhặt 0 → đúng
 triệu chứng "chưa nhặt được viên"). Đo lại dưới đúng điều kiện cũ: **0/4 lượt đỏ**.
 → Đừng sửa `config/` trong lúc test đang chạy.
+
+---
+
+## Phiên 30/10/2026 (chiều) — lỗi hình trên laptop, telemetry, điểm độ giật
+
+### 1. Đội test mất hình trên laptop — đã sửa, đã deploy
+
+Ảnh chụp của đội test lúc 12:18 cho thấy mặt đất và nhân vật mất hẳn texture, chỉ còn nét
+viền trắng. Không phải lỗi mạng.
+
+**Nguyên nhân**: `ground.filters` / `decor.filters` đặt bộ lọc màu lên container trải khắp
+bản đồ 12 000×12 000 → PixiJS dựng render texture bằng cỡ container → **16 384² ×4 byte =
+1 024 MB cho một tấm**. Laptop GPU tích hợp có `MAX_TEXTURE_SIZE` 8 192 hoặc thiếu VRAM nên
+cấp phát hỏng. Máy dev có GPU rời nên nuốt được — vì thế không kịch bản S1–S5 nào bắt được.
+
+**Sửa**: `filterArea` bám khung nhìn (bộ lọc chỉ đổi màu từng điểm ảnh, không lấy mẫu điểm
+bên cạnh, nên cắt vùng cho kết quả y hệt). Kèm cắt art thừa cỡ sau khi ĐO cỡ vẽ thật.
+
+| | Trước | Sau |
+|---|---|---|
+| Texture GPU lúc chơi | 1 076 MB | **102 MB** |
+| Art tĩnh | 607 MB | 378 MB |
+
+Giữ nguyên cổng/tường ở 512 px vì đo ra chúng vẽ 220–360 px — 512 là đúng cỡ. Nếu cắt theo
+cảm giác "cái gì cũng to quá" thì đã làm rỗ hình ở mức thu phóng gần.
+
+### 2. Hướng C — telemetry người chơi thật ✅ đã merge, đang thu trên `:9999`
+
+Theo `TELEMETRY_SPEC` + `CHANGES_v6_2`. Đã xong: DB riêng (WAL, ghi theo lô ngoài vòng tick),
+gói `tm` + `POST /telemetry/end`, server tự ghi tick/khu + CPU/RAM mỗi 10s, báo cáo 7 mục
+§4.1 (`perfreport --real`), trang `/admin/perf` (LAN + `KX_ADMIN_PASS`), tổng hợp tự động
+12:00 & 23:30 ra `docs/perf/real/`, S6 trong PERF_LOG + cột `n_sessions` trong CSV.
+
+Client nằm sau cờ `TELEMETRY=on` + `import()` động; `npm run check:telemetry-off` kiểm bản
+release không còn `sendBeacon` / `WEBGL_debug_renderer_info` / `/telemetry/end` / `longtask`.
+
+**Lệnh deploy đang dùng** (cần cả hai, thiếu cờ là client không thu):
+```
+cd client && TELEMETRY=on BUILD_ID=$(date +%Y%m%d_%H%M)_$(git rev-parse --short HEAD) npm run build
+cd ../server && go build -o kxserver ./cmd/server
+KX_ADMIN_PASS=... ./kxserver -build "<build id>"
+```
+
+### 3. Hướng B2 — điểm độ giật ✅ xong, **ĐANG CHỜ CHỦ DỰ ÁN DUYỆT**
+
+Bảng điểm: `docs/JITTER_REPORT.md`. Phím `J` (`?debug=true`) hiện tên anim · frame · pha ·
+điểm giật trên đầu từng nhân vật. **Chưa đụng vào hoạt ảnh** — đúng CHANGES_v6_1 mục 5.
+
+Ba câu hỏi đang chờ anh trả lời nằm ở cuối `JITTER_REPORT.md` (ngưỡng đỏ, có đồng ý tách hai
+bảng không, và thứ tự C→B hay B→C).
+
+## Lỗi đã biết còn mở
+
+- **Nhấp nháy + placeholder CHƯA đạt ngân sách trên server thật.** PERF_LOG lượt #5 từng ghi
+  "0 ✅" — sai, vì đo trên server test yên tĩnh. Trên `:9999`: respawn 3/0/1/1/0 và
+  placeholder 252/0/24/4/0 qua 5 lượt `flicker.mjs`; telemetry xác nhận 12 khung placeholder
+  và 13.5 respawn/phút. Nút thắt B3 **mở lại** → việc của hướng A bước 2b.
+- Dòng S6 trong PERF_LOG (#7) là **lượt kiểm chứng của agent**, không phải người thật (N=1,
+  tab headless). Dòng S6 tự động đầu tiên sẽ xuất hiện ở `docs/perf/real/` lúc 23:30.
+
+## Việc tiếp theo
+
+1. **Hướng A bước 2b** (đã có bằng chứng số thúc đẩy): View Pool, mờ ra 150 ms, `DescRequest`,
+   cấm placeholder ở build thật, `check:assets`.
+2. Hướng B hoạt ảnh (mục 6–8) — **chỉ sau khi anh duyệt bảng điểm**.
+3. Chép dòng S6 tự động đầu tiên vào PERF_LOG §3 khi nó xuất hiện.
