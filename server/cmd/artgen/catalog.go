@@ -693,7 +693,7 @@ func mapArtJobs() []Job {
 
 func allJobs() []Job {
 	var jobs []Job
-	for _, f := range []func() []Job{skillArtJobs, swordJobs, itemJobs, characterJobs, monsterJobs, mapJobs, obstacleJobs, gateJobs, vfxJobs, beastJobs, mapArtJobs, uiJobs} {
+	for _, f := range []func() []Job{skillArtJobs, swordJobs, itemJobs, characterJobs, bodyFaceJobs, monsterJobs, mapJobs, obstacleJobs, gateJobs, vfxJobs, beastJobs, mapArtJobs, uiJobs} {
 		jobs = append(jobs, f()...)
 	}
 	return jobs

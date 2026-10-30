@@ -38,3 +38,25 @@ Câu **đang chờ** nằm ở `docs/QUESTIONS.md`.
   `loadtest` + 10 tab Chrome headless (thường và 4G yếu), ghi số trước/sau.
 - **Thư viện `pixi-filters` và `revolt-fx`**: **đã duyệt**. Quy tắc chung đã thêm vào
   `CLAUDE.md`: thư viện spec ghi đích danh coi như đã duyệt, thư viện khác vẫn hỏi.
+
+---
+
+## Bó Kiếm chưa có job art (30/10/2026) — ✅ ĐÃ TRẢ LỜI
+
+**Bối cảnh**: đang làm item art sau khi anh báo "item cho skill còn thiếu". Rà hết 13 loại
+vật phẩm thì thấy **Bó Kiếm là loại duy nhất không có ảnh** — nó đang vẽ bằng Graphics (ba
+lưỡi chéo buộc dây đỏ). `ART_PROMPTS.md` không có job nào cho nó.
+
+**Em đã làm**: thêm job `item_bundle` → `items/bundle.png` vào `cmd/artgen/catalog.go`, prompt
+đồng bộ với `item_sword` (bong bóng xà phòng bóng, bên trong là ba thanh kiếm nhỏ phát sáng
+bắt chéo buộc dải vải đỏ), cỡ 128 px như kiếm vì vẽ ra cùng kích thước.
+
+**Cần anh chốt**: có đưa `item_bundle` vào `ART_PROMPTS.md` không? Nếu anh muốn Bó Kiếm giữ
+kiểu vẽ tay như hiện tại thì nói em bỏ job đi — em chưa sinh ảnh, chỉ mới thêm job.
+
+Hai loại còn lại cố ý vẽ tay và em KHÔNG đụng vào: `sword` (đã có ảnh, dùng nhánh riêng) và
+`tien_khi` (viên vàng kim đổi kích thước + vành ngoài theo giá trị, ảnh tĩnh không tả được).
+
+**Trả lời (ANSWERS 30/10):** ĐƯA VÀO. ART_PROMPTS §8 đã thêm prompt (bong bóng chứa bó **5**
+kiếm buộc ruy băng đỏ, xoè nhẹ, hào quang vàng). Đã sinh ảnh, vẽ to hơn bong bóng kiếm thường
+20%, bó rơi từ xác in số kiếm lên bong bóng. Xong trong commit `9bca2c9`.

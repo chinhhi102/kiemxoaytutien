@@ -36,6 +36,15 @@ const (
 	jitterColorFull = 18.0
 	// jitterRed: từ điểm này trở lên là BÁO ĐỎ, đề xuất sinh lại riêng frame đó.
 	jitterRed = 45.0
+	// poseOff: hộp bao lệch quá ngần này so với trung vị của animation thì frame đó **vẽ sai
+	// dáng** — báo riêng, KỂ CẢ khi điểm giật tổng chưa vượt ngưỡng (chủ dự án chốt 30/10).
+	//
+	// Vì sao phải có, và vì sao phải xét cả TỈ LỆ chứ không chỉ cao/rộng: `dep_lao idle_03`
+	// vẽ con dép NẰM BẸP trong khi ba frame kia dép đứng. Đo ra chiều cao lệch 19%, chiều
+	// rộng lệch 20% — cả hai đều LỌT dưới ngưỡng 30%. Chỉ tỉ lệ rộng/cao là lộ: 1.13 so với
+	// trung vị 0.76, lệch 49%. Thiếu phép xét tỉ lệ thì luật này bỏ sót đúng cái frame sinh
+	// ra nó.
+	poseOff = 0.30
 	// outlierFlat / outlierFull: một bước nhảy gấp dưới `outlierFlat` lần bước nhảy thông
 	// thường của chính animation là bình thường (0 điểm); gấp `outlierFull` lần là chắc chắn
 	// hỏng (100 điểm). Xem worstOutlier.
@@ -48,6 +57,7 @@ type frameStat struct {
 	name    string
 	cx, cy  float64 // trọng tâm phần không trong suốt
 	height  float64 // chiều cao hộp bao phần không trong suốt
+	boxW    float64 // chiều rộng hộp bao — dùng cho phép xét "sai dáng"
 	r, g, b float64 // màu trung bình phần không trong suốt
 	opaque  int
 	width   float64
@@ -63,6 +73,7 @@ func statFrame(img image.Image, name string) frameStat {
 	b := img.Bounds()
 	s := frameStat{name: name, cell: float64(b.Dx())}
 	minY, maxY := math.MaxInt32, -1
+	minX, maxX := math.MaxInt32, -1
 	var sx, sy, sr, sg, sb float64
 	n := 0
 	for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -85,6 +96,12 @@ func statFrame(img image.Image, name string) frameStat {
 			if y > maxY {
 				maxY = y
 			}
+			if x < minX {
+				minX = x
+			}
+			if x > maxX {
+				maxX = x
+			}
 		}
 	}
 	if n == 0 {
@@ -94,6 +111,7 @@ func statFrame(img image.Image, name string) frameStat {
 	s.cx, s.cy = sx/float64(n), sy/float64(n)
 	s.r, s.g, s.b = sr/float64(n), sg/float64(n), sb/float64(n)
 	s.height = float64(maxY - minY + 1)
+	s.boxW = float64(maxX - minX + 1)
 	s.width = float64(b.Dx())
 	return s
 }
@@ -122,6 +140,10 @@ type AnimScore struct {
 	// nào đáng xem trước.
 	Outlier      float64 `json:"outlier"`
 	OutlierFrame string  `json:"outlier_frame"`
+	// BadPose: frame vẽ SAI DÁNG (hộp bao lệch hẳn tỉ lệ so với phần còn lại của animation).
+	// Tách khỏi điểm giật vì nó là một loại hỏng khác: không phải "lệch nhẹ giữa hai frame"
+	// mà là "frame này vẽ ra một thứ khác".
+	BadPose []string `json:"bad_pose,omitempty"`
 	// Excepted: chủ dự án đã duyệt là giật CÓ CHỦ ĐÍCH (assets/jitter_exceptions.json).
 	// Vẫn có điểm đầy đủ, chỉ không tính vào số "đỏ" — để nếu art đổi khiến điểm vọt lên thì
 	// vẫn nhìn thấy, thay vì bị giấu đi vĩnh viễn.
@@ -242,6 +264,59 @@ func worstOutlier(pairs []PairScore) (string, float64) {
 	return best, bestScore
 }
 
+// badPoseFrames tìm frame vẽ SAI DÁNG: hộp bao lệch hẳn so với trung vị của animation.
+//
+// Xét ba thứ — chiều cao, chiều rộng, và TỈ LỆ rộng/cao. Tỉ lệ là thứ quan trọng nhất và dễ
+// bị bỏ quên: một frame vẽ con dép nằm bẹp có cao và rộng đều lệch chưa tới ngưỡng, nhưng
+// tỉ lệ thì lệch gấp rưỡi.
+//
+// Bỏ qua animation dưới 3 frame và animation MỘT LẦN biến hình (death, teleport): ở đó hộp
+// bao đổi hẳn là chuyện cố ý, báo đỏ chỉ tạo tiếng ồn.
+func badPoseFrames(stats []frameStat) []string {
+	if len(stats) < 3 {
+		return nil
+	}
+	// Tính trung vị trên frame KHÁC NHAU, không trên chuỗi phát.
+	//
+	// Chuỗi phát có thể lặp lại một frame (xem `anim_overrides.json`), và frame lặp hai lần
+	// thì đếm hai lần vào trung vị — đủ để kéo lệch chuẩn rồi báo oan một frame bình thường.
+	// Đã dính: sau khi cho `dep_lao idle` chạy 00→01→02→01, frame `idle_02` bị gắn cờ "sai
+	// dáng" chỉ vì `idle_01` được đếm đôi.
+	seen := map[string]bool{}
+	hs, ws, rs := []float64{}, []float64{}, []float64{}
+	for _, st := range stats {
+		if st.opaque == 0 || st.height <= 0 || st.boxW <= 0 || seen[st.name] {
+			continue
+		}
+		seen[st.name] = true
+		hs = append(hs, st.height)
+		ws = append(ws, st.boxW)
+		rs = append(rs, st.boxW/st.height)
+	}
+	if len(hs) < 3 {
+		return nil
+	}
+	mh, mw, mr := medianOf(hs), medianOf(ws), medianOf(rs)
+	var bad []string
+	flagged := map[string]bool{}
+	for _, st := range stats {
+		if st.opaque == 0 || st.height <= 0 || st.boxW <= 0 || flagged[st.name] {
+			continue
+		}
+		off := func(v, med float64) float64 {
+			if med <= 0 {
+				return 0
+			}
+			return math.Abs(v/med - 1)
+		}
+		if off(st.height, mh) > poseOff || off(st.boxW, mw) > poseOff || off(st.boxW/st.height, mr) > poseOff {
+			flagged[st.name] = true
+			bad = append(bad, st.name)
+		}
+	}
+	return bad
+}
+
 // animOf tách tên animation khỏi tên file frame ("run_03.png" → "run").
 func animOf(file string) (string, bool) {
 	m := frameRe.FindStringSubmatch(filepath.Base(file))
@@ -262,6 +337,11 @@ func buildJitterIn(assets, sub string, write bool) (*JitterReport, error) {
 	more, _ := filepath.Glob(filepath.Join(assets, "monsters", "*", sub))
 	rep := &JitterReport{Threshold: jitterRed}
 	exc := loadExceptions(assets)
+	// Chấm đúng thứ tự game THỰC SỰ PHÁT, không phải thứ tự file trong thư mục.
+	//
+	// Thiếu dòng này thì bỏ một frame hỏng ra khỏi vòng lặp xong, bảng điểm vẫn giữ nguyên
+	// con số cũ mãi mãi — và người đọc bảng sẽ tưởng việc sửa không có tác dụng.
+	ovs := loadAnimOverrides(assets)
 	for _, dir := range append(dirs, more...) {
 		char := filepath.Base(filepath.Dir(dir))
 		files, _ := filepath.Glob(filepath.Join(dir, "*.png"))
@@ -272,8 +352,11 @@ func buildJitterIn(assets, sub string, write bool) (*JitterReport, error) {
 				byAnim[a] = append(byAnim[a], f)
 			}
 		}
+		// `dir` = assets/<nhóm>/<tên>/frames_norm → nhóm là thư mục cha của thư mục cha.
+		// Lần đầu tôi viết `filepath.Dir(dir)` một lần và ra khoá "dep_lao/dep_lao".
+		group := filepath.Base(filepath.Dir(filepath.Dir(dir))) + "/" + char
 		for _, anim := range sortedAnimNames(byAnim) {
-			fs := byAnim[anim]
+			fs := applyOverride(byAnim[anim], ovs[group+"/"+anim], dir)
 			if len(fs) < 2 {
 				continue // một frame thì không có cặp nào để so
 			}
@@ -298,6 +381,12 @@ func buildJitterIn(assets, sub string, write bool) (*JitterReport, error) {
 				sc.Pairs = append(sc.Pairs, p)
 				sum += p.Score
 				sc.Worst = math.Max(sc.Worst, p.Score)
+			}
+			// CHỈ xét anim lặp. Anim một lần (death, teleport, levelup, respawn) cố ý đổi
+			// hộp bao — chạy phép này lên chúng ra 64 animation bị gắn cờ, gần như toàn bộ
+			// là nhiễu, và một danh sách như thế thì không ai đọc.
+			if loopAnim(anim) {
+				sc.BadPose = badPoseFrames(stats)
 			}
 			if len(sc.Pairs) > 0 {
 				sc.Avg = sum / float64(len(sc.Pairs))
@@ -360,6 +449,31 @@ func writeJitterTo(assets, rel string, rep *JitterReport) error {
 	return os.WriteFile(filepath.Join(assets, filepath.FromSlash(rel)), b, 0o644)
 }
 
+// applyOverride đổi danh sách file frame theo thứ tự đã ép (nếu có).
+//
+// Frame nào ép nhắc tới mà không tồn tại thì bỏ qua — cùng cách xử lý với `buildAtlas`, để
+// bảng điểm và atlas không bao giờ nói hai chuyện khác nhau.
+func applyOverride(files []string, ov AnimOverride, dir string) []string {
+	if len(ov.Frames) == 0 {
+		return files
+	}
+	have := map[string]string{}
+	for _, f := range files {
+		have[strings.TrimSuffix(filepath.Base(f), ".png")] = f
+	}
+	out := make([]string, 0, len(ov.Frames))
+	for _, name := range ov.Frames {
+		if p, ok := have[name]; ok {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return files
+	}
+	_ = dir
+	return out
+}
+
 func sortedAnimNames(m map[string][]string) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
@@ -369,13 +483,23 @@ func sortedAnimNames(m map[string][]string) []string {
 	return out
 }
 
+// medianOf là TRUNG VỊ đúng nghĩa: số chẵn phần tử thì lấy trung bình hai phần tử giữa.
+//
+// Bản cũ lấy phần tử giữa TRÊN, và sai lệch đó không vô hại: `dep_lao idle` có 4 frame với
+// tỉ lệ 0.54 / 0.70 / 0.82 / 1.13 — lấy giữa trên ra 0.82 thay vì 0.76, đủ để `idle_01`
+// vượt ngưỡng 30% và bị báo "sai dáng" oan, trong khi chủ dự án nhìn bằng mắt thì thấy nó
+// bình thường. Một phép kiểm báo oan là một phép kiểm sắp bị phớt lờ.
 func medianOf(v []float64) float64 {
 	if len(v) == 0 {
 		return 0
 	}
 	s := append([]float64(nil), v...)
 	sort.Float64s(s)
-	return s[len(s)/2]
+	n := len(s)
+	if n%2 == 1 {
+		return s[n/2]
+	}
+	return (s[n/2-1] + s[n/2]) / 2
 }
 
 // printJitter in bảng điểm, TÁCH HAI NHÓM.

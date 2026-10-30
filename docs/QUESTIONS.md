@@ -12,23 +12,10 @@ theo và cả bốn đã chuyển sang `QUESTIONS_DONE.md`. Hai việc "chờ an
 CHANGES_v4 mục 25–27, và hai thư viện `pixi-filters` / `revolt-fx` — cũng đã được duyệt,
 xem cuối `QUESTIONS_DONE.md`.
 
-**Việc lớn tiếp theo** (không phải câu hỏi): tối ưu theo đúng thứ tự anh chốt — mạng
-(mục 27) → server (mục 26, pprof) → client phần rẻ (mục 25.1: gộp vòng kiếm thành texture,
-BitmapText, cull). Kèm đo lại `loadtest` và 10 tab Chrome headless ở cả mạng thường lẫn 4G
-yếu, ghi số trước/sau.
+**Việc lớn tiếp theo** (không phải câu hỏi), cập nhật 30/10 chiều:
+**NETCODE bước 3 — Protocol v2** (NETCODE_SPEC v1.2): schema chung + generator + bài đối
+chiếu golden/fuzz TRƯỚC, rồi vòng đời `Spawn/Desc/Update/Despawn` tường minh, delta theo ack,
+keyframe 2s, lượng tử hoá §4.6. Mục tiêu: đóng nốt respawn (về 0) và gói < 6 KB.
 
-## Bó Kiếm chưa có job art (30/10/2026)
-
-**Bối cảnh**: đang làm item art sau khi anh báo "item cho skill còn thiếu". Rà hết 13 loại
-vật phẩm thì thấy **Bó Kiếm là loại duy nhất không có ảnh** — nó đang vẽ bằng Graphics (ba
-lưỡi chéo buộc dây đỏ). `ART_PROMPTS.md` không có job nào cho nó.
-
-**Em đã làm**: thêm job `item_bundle` → `items/bundle.png` vào `cmd/artgen/catalog.go`, prompt
-đồng bộ với `item_sword` (bong bóng xà phòng bóng, bên trong là ba thanh kiếm nhỏ phát sáng
-bắt chéo buộc dải vải đỏ), cỡ 128 px như kiếm vì vẽ ra cùng kích thước.
-
-**Cần anh chốt**: có đưa `item_bundle` vào `ART_PROMPTS.md` không? Nếu anh muốn Bó Kiếm giữ
-kiểu vẽ tay như hiện tại thì nói em bỏ job đi — em chưa sinh ảnh, chỉ mới thêm job.
-
-Hai loại còn lại cố ý vẽ tay và em KHÔNG đụng vào: `sword` (đã có ảnh, dùng nhánh riêng) và
-`tien_khi` (viên vàng kim đổi kích thước + vành ngoài theo giá trị, ảnh tĩnh không tả được).
+Tối ưu CHANGES_v4 mục 25–27 **đã xong** (mốc chuẩn #4 trong PERF_LOG). Hướng A (một thân
+nhiều mặt) để sau cùng — art thử đã sinh cho 3 nhân vật, chưa code.

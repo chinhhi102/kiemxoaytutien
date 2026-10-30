@@ -241,7 +241,7 @@ Tùy chọn giống quảng cáo — **lưỡi liềm cong**: `{STYLE} a single 
 | Asset | Prompt |
 |---|---|
 | Bong bóng kiếm | `{STYLE} a glossy transparent soap bubble containing a small glowing sword, shiny highlight, 256x256` |
-| Bó Kiếm (`item_bundle` → `items/bundle.png`) | Dùng đúng prompt agent đã đặt trong `cmd/artgen/catalog.go` (đồng bộ phong cách `item_sword`): `{STYLE} a glossy transparent soap bubble containing three small glowing swords crossed and tied together with a red cloth ribbon, shiny highlight` — cùng canvas với `item_sword`. Trong game vẽ **to hơn bong bóng kiếm thường 20%** để phân biệt; bó rơi từ xác in số kiếm lên bong bóng |
+| Bó Kiếm (`item_bundle` → `items/bundle.png`) | `{STYLE} a glossy transparent soap bubble containing a bundle of five small swords tied together with a red ribbon, swords fanned out slightly, golden glow, shiny highlight` (đã sinh theo bản này — giữ nguyên). Trong game to hơn bong bóng kiếm thường 20%; bó rơi từ xác in số kiếm lên bong bóng |
 | EXP nhỏ/vừa/lớn | `{STYLE} a glowing {green|blue|gold} spirit orb gem, sparkly, 128x128` |
 
 Vật phẩm buff: mỗi cái là 1 bong bóng chứa icon, cùng 1 template:

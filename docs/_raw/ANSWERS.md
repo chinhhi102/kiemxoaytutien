@@ -258,3 +258,22 @@ Kế hoạch (b) **duyệt**. Bắt đầu Bước 2a → 2b ngay. Bài đo `fli
 
 
 > Ghi chú: `docs/QUESTIONS.md` bản tôi đọc còn ghi "việc lớn tiếp theo: tối ưu 25–27" — phần đó đã xong (mốc #4). Cập nhật lại QUESTIONS.md cho đúng hiện trạng; câu Bó Kiếm chuyển sang QUESTIONS_DONE.
+
+---
+
+## Trả lời báo cáo 5 việc + netcode 2b (999cf62)
+
+**Đã xem `docs/anim_preview/dep_lao_idle_sau.gif` (tách từng frame) — KHÔNG phải ngoại lệ.**
+- Frame 1–3: dép đứng, nghiêng nhẹ qua lại — ổn (frame 3 mất lưỡi, chấp nhận được như đổi biểu cảm).
+- **Frame 4 (`idle_03`) vẽ sai dáng hẳn**: dép nằm bẹp xuống đất, quai dựng lên, khác hoàn toàn 3 frame kia. Đây là frame sinh hỏng, không phải đảo mắt cố ý → không đưa vào `jitter_exceptions.json`.
+- Làm ngay: tạm bỏ frame 4, chạy vòng lặp **1 → 2 → 3 → 2**. Thêm job sinh lại `dep_lao idle_03` (dép đứng, nghiêng nhẹ ngược chiều frame 1) vào ART_JOBS.
+- Bài học cho bộ chấm: frame có **hộp bao khác hẳn tỉ lệ** (cao/rộng lệch > 30% so với trung vị anim) → báo đỏ riêng là "sai dáng", kể cả khi điểm tổng chưa vượt ngưỡng.
+
+**Bó Kiếm**: giữ bản đã sinh (5 kiếm, ruy băng đỏ, hào quang vàng). ART_PROMPTS §8 đã sửa lại cho khớp bản này. Nhãn số ở lớp thế giới — tốt.
+
+**Danh sách ngoại lệ, CI**: duyệt nguyên như em làm (giữ điểm thật cho anim ngoại lệ; chặn cứng chỉ với art người chơi thấy placeholder, art trang trí chỉ cảnh báo).
+
+**Netcode 2b: duyệt** — placeholder 0/16 lượt. Respawn còn 2/16 chờ bước 3 là đúng.
+
+**Tiếp theo: làm bước 3 (Protocol v2)** — theo NETCODE_SPEC v1.2: schema chung + generator + bài đối chiếu golden/fuzz **trước**, rồi vòng đời `Spawn/Desc/Update/Despawn` tường minh, delta theo ack, keyframe 2s, lượng tử hóa §4.6. Mục tiêu đóng nốt respawn (0/16) và gói < 6 KB.
+- **Song song (không chặn bước 3)**: nếu còn quota genart thì bắt đầu **sinh art cho A** (bộ 8 khuôn mặt + thân run 6 / idle 4 không mặt theo ART_PROMPTS §4.3b) cho 2–3 nhân vật trước để thử. Chưa code A.

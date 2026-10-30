@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/draw"
 	"io/fs"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -62,6 +63,7 @@ type atlasFile struct {
 func buildAtlases(assets string) error {
 	dirs, _ := filepath.Glob(filepath.Join(assets, "characters", "*", "frames"))
 	more, _ := filepath.Glob(filepath.Join(assets, "monsters", "*", "frames"))
+	overrides := loadAnimOverrides(assets)
 	for _, d := range append(dirs, more...) {
 		// Ưu tiên frame ĐÃ CHUẨN HOÁ nếu có (GAME_SPEC §12.5 B: chuẩn hoá chạy TRƯỚC khi
 		// ghép atlas). Không có thì dùng frame gốc, nên repo chưa chạy `normalize` vẫn ghép
@@ -69,7 +71,7 @@ func buildAtlases(assets string) error {
 		if n := filepath.Join(filepath.Dir(d), "frames_norm"); dirHasPNG(n) {
 			d = n
 		}
-		if err := buildAtlas(d); err != nil {
+		if err := buildAtlas(d, overrides); err != nil {
 			return err
 		}
 	}
@@ -82,7 +84,39 @@ func dirHasPNG(dir string) bool {
 	return len(m) > 0
 }
 
-func buildAtlas(framesDir string) error {
+// AnimOverride ép thứ tự frame của một animation (assets/anim_overrides.json).
+type AnimOverride struct {
+	Frames     []string `json:"frames"`
+	Reason     string   `json:"reason"`
+	ApprovedBy string   `json:"approved_by"`
+	Regen      string   `json:"regen"`
+}
+
+// loadAnimOverrides đọc danh sách ép thứ tự frame.
+//
+// Không có file là bình thường. File HỎNG thì phải kêu: im lặng bỏ qua nghĩa là một frame
+// đã được cố ý loại bỏ bỗng quay lại trong game, và không ai hiểu vì sao.
+func loadAnimOverrides(assets string) map[string]AnimOverride {
+	out := map[string]AnimOverride{}
+	path := filepath.Join(assets, "anim_overrides.json")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return out
+	}
+	var doc struct {
+		Overrides map[string]AnimOverride `json:"overrides"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		log.Printf("CẢNH BÁO: %s hỏng (%v) — bỏ qua mọi ép thứ tự frame", path, err)
+		return out
+	}
+	for k, v := range doc.Overrides {
+		out[k] = v
+	}
+	return out
+}
+
+func buildAtlas(framesDir string, overrides map[string]AnimOverride) error {
 	files, _ := filepath.Glob(filepath.Join(framesDir, "*.png"))
 	sort.Strings(files)
 	if len(files) == 0 {
@@ -109,6 +143,30 @@ func buildAtlas(framesDir string) error {
 		}
 	}
 	parent := filepath.Dir(framesDir)
+	// Ép thứ tự frame nếu có (assets/anim_overrides.json). Áp SAU khi đã ghép ảnh: mọi frame
+	// vẫn nằm trong atlas, chỉ danh sách phát là đổi — nên gỡ ép ra chỉ cần sửa JSON, không
+	// phải ghép lại atlas.
+	key := filepath.Base(filepath.Dir(parent)) + "/" + filepath.Base(parent)
+	for anim, a := range af.Anims {
+		ov, ok := overrides[key+"/"+anim]
+		if !ok {
+			continue
+		}
+		valid := make([]string, 0, len(ov.Frames))
+		for _, f := range ov.Frames {
+			if _, exists := af.Frames[f]; exists {
+				valid = append(valid, f)
+			} else {
+				log.Printf("CẢNH BÁO: ép thứ tự %s/%s nhắc tới frame %q không có — bỏ qua frame đó", key, anim, f)
+			}
+		}
+		if len(valid) == 0 {
+			continue
+		}
+		a.Frames = valid
+		af.Anims[anim] = a
+		log.Printf("ép thứ tự %s/%s: %d frame (%s)", key, anim, len(valid), ov.Reason)
+	}
 	if err := savePNG(filepath.Join(parent, "atlas.png"), sheet); err != nil {
 		return err
 	}

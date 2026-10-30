@@ -1,0 +1,21 @@
+{
+  "_doc": [
+    "Ép thứ tự frame của một animation, thay cho thứ tự mặc định (đọc theo tên file).",
+    "",
+    "Dùng khi một frame sinh HỎNG mà chưa sinh lại kịp: bỏ nó ra và lặp lại frame khác, để",
+    "trong game không còn thấy cú nhảy — thay vì chờ art mới rồi để người chơi nhìn lỗi.",
+    "Đây là biện pháp TẠM: mỗi mục phải có `regen` ghi frame cần sinh lại.",
+    "",
+    "Khoá: '<thư mục>/<tên>/<anim>', ví dụ 'monsters/dep_lao/idle'.",
+    "`frames` là tên frame không có đuôi .png, theo đúng thứ tự muốn phát."
+  ],
+  "overrides": {
+    "monsters/dep_lao/idle": {
+      "frames": ["idle_00", "idle_01", "idle_02", "idle_01"],
+      "reason": "idle_03 vẽ con dép NẰM BẸP, quai dựng lên — khác hẳn ba frame kia (dép đứng). Bộ chấm bắt được: tỉ lệ rộng/cao 1.13 so với trung vị 0.76, lệch 49%. Chủ dự án xác nhận bằng mắt 30/10.",
+      "approved_by": "chủ dự án",
+      "date": "2026-10-30",
+      "regen": "dep_lao idle_03 — dép đứng, nghiêng nhẹ ngược chiều frame 1"
+    }
+  }
+}
