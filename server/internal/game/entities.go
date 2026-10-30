@@ -171,7 +171,7 @@ type Player struct {
 	orbPicked     int
 	orbPickedID   uint32
 	orbPickedKind string
-	breakFlushAt float64
+	breakFlushAt  float64
 }
 
 func (p *Player) HasBuff(b int, now float64) bool { return p.Buffs[b] > now }

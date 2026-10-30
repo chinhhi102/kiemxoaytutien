@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Cultivation struct {
@@ -316,6 +317,12 @@ type Bots struct {
 	SpawnEverySecs float64 `json:"spawn_every_secs"`
 	SpawnBatch     int     `json:"spawn_batch"`
 	RespawnSecs    float64 `json:"respawn_secs"`
+	// Hành vi giống người khi chết (spec v6.1 §9.4). Bot cũ hồi sinh sau đúng 3 giây mọi
+	// lần — nhìn kill feed là thấy nhịp máy.
+	RespawnSecsRange     []float64 `json:"respawn_secs_range"`
+	RejoinSameNameChance float64   `json:"rejoin_same_name_chance"`
+	IdleAfterJoinChance  float64   `json:"idle_after_join_chance"`
+	IdleAfterJoinSecs    []float64 `json:"idle_after_join_secs"`
 	// SpawnRank: bot sinh ra ngang với người đang đứng hạng này trong phòng (mặc định 11,
 	// tức ngay dưới Top 10). Phòng chưa đủ người để có hạng đó → sinh ở Luyện Khí.
 	// Không có trần cảnh giới: phòng toàn Nguyên Anh thì bot mới cũng Nguyên Anh.
@@ -454,7 +461,32 @@ func Load(path string) (*Config, []byte, error) {
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return nil, nil, fmt.Errorf("parse config: %w", err)
 	}
+	// Tên bot nằm ở FILE RIÊNG `config/bot_names.txt` (spec v6.1 §9.4), không nằm trong
+	// game.json: một nghìn dòng tên nhét vào JSON thì mỗi lần sửa một con số cân bằng là
+	// phải cuộn qua chúng, và ai cũng ngại mở file.
+	//
+	// Thiếu file thì giữ danh sách trong game.json làm dự phòng — máy dev chưa kéo file mới
+	// vẫn chạy được, chỉ là bot có ít tên hơn.
+	if names := loadBotNames(filepath.Join(filepath.Dir(path), "bot_names.txt")); len(names) > 0 {
+		c.Bots.Names = names
+	}
 	return &c, raw, nil
+}
+
+// loadBotNames đọc file tên bot: mỗi dòng một tên, bỏ dòng trống và dòng bắt đầu bằng `#`.
+func loadBotNames(path string) []string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		s := strings.TrimSpace(line)
+		if s != "" && !strings.HasPrefix(s, "#") {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // FindRepoFile walks up from the working directory to locate a repo-relative path

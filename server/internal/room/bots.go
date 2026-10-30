@@ -15,6 +15,13 @@ import (
 //     và vẫn có khu trống trơn — người chơi qua cổng sang đó thấy một thế giới chết.
 func (r *Room) updateBots(dt float64) {
 	r.processRespawns()
+	// Gom tên vừa rời của mọi khu — chạy ở pha ĐƠN LUỒNG, sau khi các khu đã tick xong.
+	for _, z := range r.zones {
+		for _, n := range z.departed {
+			r.rememberName(n, z.G.Time)
+		}
+		z.departed = z.departed[:0]
+	}
 	// Vá sàn chạy MỖI TICK, không theo nhịp sinh bot. Bot đi lại giữa các khu bất cứ lúc
 	// nào (qua cổng, hồi sinh), nên một khu có thể tụt xuống dưới sàn ngay giữa hai nhịp
 	// sinh bot — mà nhịp đó là 2 giây. Buộc phải chờ hết nhịp mới sửa thì người chơi vừa
@@ -177,10 +184,11 @@ func (r *Room) spawnBotIn(z *Zone, level, swords int) *game.Player {
 	if z == nil {
 		return nil
 	}
-	names := r.cfg.Bots.Names
+	// Tên và nhân vật theo luật §9.4 (xem `botnames.go`): không trùng trong phòng, không
+	// dùng lại tên vừa rời đi 10 phút, nhân vật theo phân bố người chơi thật.
 	p := z.G.AddPlayer(game.SpawnOptions{
-		Name:  names[r.rng.Intn(len(names))],
-		Char:  r.cfg.Characters[r.rng.Intn(len(r.cfg.Characters))],
+		Name:  r.pickBotName(z.G.Time),
+		Char:  r.pickBotChar(),
 		IsBot: true, Level: level, Swords: swords,
 	})
 	z.brains[p.ID] = bot.New(p.ID, r.rng.Int63(), z.G)
@@ -226,13 +234,37 @@ func (r *Room) randomBotLevel() (int, int) {
 	return level, 1 + r.rng.Intn(prog.MaxSwords(realm))
 }
 
+// onBotDeath bắt chước hành vi NGƯỜI THẬT khi chết (spec v6.1 §9.4).
+//
+// Người thật chết thì thấy màn Tổng kết, đọc vài giây rồi bấm "Chơi tiếp" — hoặc tắt game.
+// Bot cũ hồi sinh sau đúng 3 giây, mọi lần, mọi con: nhìn kill feed là thấy ngay nhịp máy.
+// Giờ 70% quay lại **cùng tên** sau 4–12 giây (như bấm Chơi tiếp), 30% rời hẳn phòng và một
+// bot khác tên vào sau — đúng như người chơi bỏ đi và người mới vào.
 func (r *Room) onBotDeath(z *Zone, p *game.Player) {
+	// ⚠ Hàm này chạy TRONG goroutine của khu (`handleDeaths` ← `stepZone`), nên chỉ được
+	// đụng dữ liệu CỦA KHU. Dùng `r.rng` hay ghi thẳng `r.recentNames` ở đây là đọc-ghi
+	// song song với bốn khu kia — `go test -race` bắt được ngay, và ngoài đời là
+	// `fatal error: concurrent map writes` làm sập server (đã dính đúng vậy hôm 29/10).
+	// Tên người vừa rời gom vào hàng chờ của khu, `updateBots` gom lại sau khi mọi khu
+	// tick xong.
 	if r.Humans()+r.Bots()-1 >= r.cfg.Room.BotFillTarget {
+		z.departed = append(z.departed, p.Name)
 		z.G.RemovePlayer(p.ID)
 		delete(z.brains, p.ID)
 		return
 	}
-	z.respawns = append(z.respawns, pendingRespawn{id: p.ID, at: z.G.Time + r.cfg.Bots.RespawnSecs})
+	bc := r.cfg.Bots
+	if z.rng.Float64() >= bc.RejoinSameNameChance {
+		// "Rời phòng": bỏ hẳn con này. `updateBots` sẽ lấp chỗ trống bằng một bot MỚI, tên
+		// mới — nhịp lấp do `spawn_every_secs` lo, nên khoảng trống tự nhiên 5–20 giây.
+		z.departed = append(z.departed, p.Name)
+		z.G.RemovePlayer(p.ID)
+		delete(z.brains, p.ID)
+		return
+	}
+	lo, hi := bc.RespawnSecsRange[0], bc.RespawnSecsRange[1]
+	wait := lo + z.rng.Float64()*(hi-lo)
+	z.respawns = append(z.respawns, pendingRespawn{id: p.ID, at: z.G.Time + wait})
 }
 
 // respawnQueued chỉ hỏi hàng chờ CỦA KHU đó — gọi từ goroutine của chính khu ấy.

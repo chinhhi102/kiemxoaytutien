@@ -43,11 +43,13 @@ type Room struct {
 	recorder  Recorder
 	rng       *rand.Rand
 	botTimer  float64
-	lbTimer   float64
-	emptyFor  float64
-	reserved  int // humans counted by the manager (guarded by Manager.mu)
-	closed    bool
-	snapEvery float64
+	// recentNames: tên vừa rời phòng → thời điểm được phép dùng lại (spec §9.4).
+	recentNames map[string]float64
+	lbTimer     float64
+	emptyFor    float64
+	reserved    int // humans counted by the manager (guarded by Manager.mu)
+	closed      bool
+	snapEvery   float64
 	// rankAt: hạng của từng người, chụp MỘT LẦN đầu mỗi tick.
 	//
 	// Bảng xếp hạng tính chung cả thế giới, nên tính nó phải đọc người chơi của mọi khu —
