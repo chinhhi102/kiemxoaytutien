@@ -64,6 +64,7 @@ Mỗi lượt 1 dòng **cho mỗi kịch bản đã chạy**. Ô đạt ngân s�
 | 4 | 2026-10-30 | `f5720c0` | Mốc chuẩn (nhịp chơi) | S5 | – | – | – | – | – | – | – | – | Lượt chết 2.10 → **4.70** / bot / 5 phút | Do luật v5.8 (bị chém về sàn cảnh giới) |
 | 6 | 2026-10-30 | `ab0f706` | **Sửa texture 1 GB** — `filterArea` bám khung nhìn + atlas 128 + boulder 512 | S4\*\* | – | – | – | 58 / – | 0.5 | 112 | 0 | – | Texture GPU **1 076 → 102 MB**; art tĩnh 607 → 378 MB | Vẫn còn placeholder/respawn (xem dòng 7) |
 | 7 | 2026-10-30 | `d34def5` | Mở telemetry trên `:9999` — **lượt chạy kiểm chứng, KHÔNG phải người thật** | S6\*\*\* | 0.35 / 1.54 ✅ | 7.9 / 8.2 ✅ | 0.5 ✅ | 59 / 28 ⚠ | – | 54 ✅ | 12 ❌ | 13.50 ❌ | — | Placeholder và respawn vẫn vượt ngân sách → hướng A bước 2b |
+| 8 | 2026-10-30 | `9bca2c9` | **NETCODE bước 2b** — DescRequest, nhân vật dự phòng, mờ ra 150 ms, View Pool | FLICKER | – | – | – | 60 / – | – | 36 | **0** ✅ | **0.4** ⚠ | Placeholder 252→**0** qua 16 lượt | Respawn chưa về 0 hẳn (2/16 lượt có 1) — cần `Despawn` tường minh ở bước 3 |
 
 \* Dòng có dấu `*`: đo trước khi chuẩn hóa kịch bản, chỉ để tham khảo, **không dùng làm mốc so sánh**. Lượt tối ưu kế tiếp phải chạy lại đủ S1–S4 để tạo **mốc chuẩn mới (#4)**.
 
@@ -274,7 +275,7 @@ Việc tiếp theo đề xuất: <1–3 việc, xếp theo lợi ích / công s�
 |---|---|---|---|---|---|
 | B1 | ItemsAdded dồn 1 gói khi camera lùi xa | Gói 38 KB, nghẽn mạng yếu | Lượt #0 | **Đóng** — gói 38.3 → 6.8 KB | #4 |
 | B2 | Server tick vượt ngân sách khi 10 Đạo Tổ chụm | Lag server | Lượt #0 | **Đóng** — tick 11.45 → 1.56 ms | #4 |
-| B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Trên server test: **38 → 0** respawn, **462 → 0** khung placeholder. Nhưng trên `:9999` THẬT vẫn **12 khung placeholder · 13.5 respawn/phút** (telemetry, dòng #7) và **3/0/1/1/0 respawn qua 5 lượt `flicker.mjs`** | **Mở lại.** Phần dễ đã xong; còn View Pool + `DescRequest` ở bước 2b | #5, #7 |
+| B3 | Nhấp nháy + placeholder khi entity vào khung | Hình ảnh | Trên `:9999` THẬT, 16 lượt `flicker.mjs` sau bước 2b: **placeholder 0/16 lượt** (trước 2b: 252/0/24/4/0), **respawn 2/16 lượt có đúng 1** (trước 2b ~1.0/30s, trước 2a 38/30s) | **Placeholder: đóng.** Respawn: còn hở, cần `Despawn` tường minh từ server (bước 3) — client không phân biệt được "vắng mặt do AOI" với "đã rời đi thật" | #5, #7, #8 |
 | B4 | Băng thông game thật 61.7 KB/s | Mạng yếu | Lượt #0b | Mở — S2 còn **45.5 KB/s đỉnh** ở tab Đạo Tổ (ngân sách 40) | – |
 | B5 | Gói snapshot 6.8 KB vs ngân sách mới 6 KB | Mạng yếu | Lượt #4 | Mở — cần Protocol v2 nhị phân (NETCODE bước 3) | – |
 | **B6** | **Bài đo S3 không nâng được Đạo Tổ**; draw call đọc ra 0 | Không đánh giá được kịch bản nặng trên mạng yếu | Lượt #4 | Mở — **phải sửa trước khi tin số S3** | – |

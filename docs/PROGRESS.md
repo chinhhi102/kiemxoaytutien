@@ -760,3 +760,42 @@ Thêm job `item_bundle` — chờ anh chốt (xem QUESTIONS.md).
 - **Hướng A netcode bước 2b** — View Pool, mờ ra, `DescRequest`, cấm placeholder build thật.
   Vẫn là nút thắt B3 đang mở, có số đo thúc đẩy.
 - `dep_lao idle` 56.8 còn đỏ — nhiều khả năng là hoạt ảnh đảo mắt cố ý, cần anh nhìn bằng `J`.
+
+## Phiên 30/10 (chiều, tiếp 2) — trả lời của anh về B+C, rồi netcode 2b
+
+Năm việc anh giao trong `ANSWERS.md` "Trả lời báo cáo B + C" — **xong cả năm**.
+
+1. **Push GitHub** ✅ — `main` đã lên tới `9bca2c9`, kèm `docs/anim_preview/`.
+2. **Bó Kiếm** ✅ — prompt lấy nguyên văn ART_PROMPTS §8 (bó **5** kiếm, ruy băng đỏ, hào
+   quang vàng), vẽ to hơn bong bóng kiếm đơn 20%, bó rơi từ xác in số kiếm lên bong bóng.
+3. **Danh sách ngoại lệ** ✅ — `assets/jitter_exceptions.json`, hiện **rỗng** (chưa thêm
+   `dep_lao` như anh dặn). Anim được duyệt không tính đỏ nhưng **vẫn giữ điểm**, có 3 test canh.
+4. **CI** ✅ — `.github/workflows/ci.yml`: `go vet`, `go test -race`, `check:assets`,
+   `check:items`, build, `check:telemetry-off`.
+5. **Netcode 2b** ✅ (phần placeholder) — xem dưới.
+
+### Netcode 2b — placeholder đạt ngân sách, respawn còn hở
+
+Đo trên `:9999` bằng `flicker.mjs`, **16 lượt**:
+
+| | trước 2a | sau 2a | sau 2b |
+|---|---|---|---|
+| Khung placeholder | 462/596 | 252 / 0 / 24 / 4 / 0 | **0 ở cả 16 lượt** ✅ |
+| Respawn trong 2s | 38 | 3 / 0 / 1 / 1 / 0 | 2/16 lượt có đúng 1 |
+
+**Gốc rễ của placeholder là `DescRequest`**: tên + nhân vật chỉ gửi LẦN ĐẦU, server nhớ bằng
+`knownPlayers`. Client mất mô tả đó (vứt view, rớt gói) thì server **không bao giờ** gửi lại
+→ client kẹt vĩnh viễn với một entity không biết vẽ gì. Giờ client hỏi, server quên đúng
+những id được hỏi.
+
+**Respawn chưa về 0 và sẽ không về 0 ở bước 2b** — client không phân biệt được "vắng mặt vì
+AOI" với "đã rời đi thật". Spec nói rõ 2b chỉ là bản vá rẻ; cần `Despawn` tường minh từ
+server ở **bước 3**.
+
+### Còn mở
+- **Netcode bước 3** — `Despawn` tường minh, để respawn về 0 hẳn.
+- **A (một thân nhiều mặt)** — cần art mới, sau cùng theo thứ tự anh chốt.
+- `dep_lao idle` 56.8 — chờ anh xem bằng `J` + `]` rồi quyết có thêm vào ngoại lệ không.
+- 5 tile vẫn sót nền magenta sau 2 lượt sinh lại (đã vá tạm bằng màu trung bình).
+- **Lưu ý khi commit**: dùng `git commit -F <file>` thay vì `-m "..."` — dấu backtick trong
+  message bị shell diễn giải, commit `9bca2c9` mất vài từ vì lỗi này.

@@ -12,3 +12,4 @@ run,date,commit,label,scenario,tick_avg_ms,tick_p95_ms,cpu_pct,kbps_avg,kbps_pea
 5,2026-10-30,netcode-2a,"NETCODE 2a - chống nhấp nháy (sau)",FLICKER,,,,,,,,,,,,,,0,0,,,,"ĐO TRÊN SERVER TEST TĨNH — xem dòng 7: trên :9999 thật vẫn 12 khung placeholder, 13.5 respawn/phút",
 6,2026-10-30,ab0f706,"Sửa texture 1 GB (filterArea + atlas 128)",S4,,,,,,,,58.0,,0.5,112,,102.0,0,,,,,"texture GPU 1076 -> 102 MB; art 607 -> 378 MB",
 7,2026-10-30,d34def5,"Mở telemetry :9999 - lượt kiểm chứng",S6,0.35,1.54,7.0,7.9,8.2,0.5,1.0,58.6,28.2,,54,3701,,12,13.50,,,,"KHÔNG phải người thật: N=1, tab headless của chính agent",1
+8,2026-10-30,9bca2c9,"NETCODE 2b - DescRequest + dự phòng + pool",FLICKER,,,,,,,,60.0,,,36,,,0,0.40,,,,"placeholder 0/16 lượt; respawn 2/16 lượt có 1",
