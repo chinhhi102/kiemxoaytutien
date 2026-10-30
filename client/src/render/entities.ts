@@ -90,12 +90,15 @@ export class MonsterSprite {
   update(x: number, y: number, s: MonsterState, now: number): void {
     this.root.position.set(x, y);
     this.root.zIndex = y;
-    if (s.hp !== this.lastHp) {
-      if (this.lastHp > s.hp) {
+    // `state.ts` đã điền lại máu từ gói trước khi server bỏ trường `hp` (delta snapshot),
+    // nên tới đây luôn có số; `?? this.lastHp` chỉ là lưới an toàn cho gói đầu tiên.
+    const hp = s.hp ?? this.lastHp;
+    if (hp !== this.lastHp) {
+      if (this.lastHp > hp) {
         this.hurtUntil = now + 0.2;
       }
-      this.lastHp = s.hp;
-      this.drawHp(s.hp, s.mx);
+      this.lastHp = hp;
+      this.drawHp(hp, s.mx);
     }
     const hurt = now < this.hurtUntil;
     // Chỉ nhuộm đỏ khi dính đòn. KHÔNG bóp chiều cao: dòng cũ nhân `scale.y × 0.97` mỗi

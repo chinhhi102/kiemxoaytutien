@@ -32,23 +32,61 @@ export interface PlayerState {
   ch?: string;
 }
 
+/**
+ * Toạ độ quái và vật phẩm là **số nguyên đơn vị thế giới** (uint16), không phải float —
+ * spec mục 27 "lượng tử hoá". Sai số tối đa nửa đơn vị, bằng 1/60 bán kính thân người.
+ *
+ * Toạ độ NGƯỜI CHƠI vẫn giữ float: client dùng nó để đối chiếu phần mình tự dự đoán
+ * (§8.2a), thêm sai số vào đó là bộ đếm "hiệu chỉnh/giây" vừa kéo về 0 sẽ chạy lại.
+ */
 export interface MonsterState {
   id: number;
   x: number;
   y: number;
-  hp: number;
+  /** hp CHỈ có khi máu đổi (delta snapshot, spec mục 27); thiếu = giữ nguyên máu cũ. */
+  hp?: number;
   /** k, mx, r chỉ có ở gói ĐẦU TIÊN thấy con quái này (spec mục 27); sau đó client giữ lại. */
   k: string;
   mx: number;
   r: number;
 }
 
+/**
+ * ItemState là dạng **client dùng bên trong**: `k` là tên loại.
+ *
+ * Trên dây `k` là chỉ số (`WireItemState`), và việc đổi chỉ số → tên làm đúng MỘT lần ngay
+ * khi nhận gói (`state.ts`). Nếu để kiểu số lan tới tận chỗ vẽ thì mọi phép so `k === 'orb'`
+ * rải khắp `entities.ts`, `orblayer.ts`, `scene.ts` đều phải sửa — và chỉ cần sót một chỗ là
+ * vật phẩm vẽ sai loại mà không có gì báo.
+ */
 export interface ItemState {
   id: number;
   x: number;
   y: number;
   k: string;
   v?: number;
+}
+
+/** WireItemState là đúng những gì server gửi: `k` là chỉ số trong ITEM_KINDS. */
+export interface WireItemState {
+  id: number;
+  x: number;
+  y: number;
+  k: number;
+  v?: number;
+}
+
+/**
+ * ITEM_KINDS khớp **từng dòng** với `netproto.ItemKinds` bên server: loại vật phẩm gửi qua
+ * mạng bằng chỉ số, vì "skill_scroll" tốn 13 byte mỗi viên mỗi gói mà một gói có thể có 60
+ * vật phẩm mới vào tầm nhìn. Thêm loại mới thì thêm vào CUỐI, đừng chèn giữa.
+ */
+export const ITEM_KINDS = ['orb', 'sword', 'bundle', 'chest', 'tien_khi', 'skill_scroll',
+  'spin', 'haste', 'magnet', 'hard', 'shield', 'exp2', 'stealth'] as const;
+
+/** itemKind đổi chỉ số trên dây thành tên loại; chỉ số lạ trả 'orb' để không làm sập client. */
+export function itemKind(k: number): string {
+  return ITEM_KINDS[k] ?? 'orb';
 }
 
 export interface GameEvent {
@@ -70,7 +108,7 @@ export interface Snapshot {
   ack: number;
   p: PlayerState[] | null;
   m: MonsterState[] | null;
-  ia?: ItemState[];
+  ia?: WireItemState[];
   ir?: number[];
   ev?: GameEvent[];
   /** sv: thời gian server xử lý một tick của phòng (ms) — chỉ để overlay đo (spec §13.6). */
@@ -92,7 +130,7 @@ export function statusOn(st: number | undefined, name: (typeof STATUS)[number]):
   return ((st ?? 0) & (1 << STATUS.indexOf(name))) !== 0;
 }
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export interface Welcome {
   t: 'welcome';

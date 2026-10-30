@@ -251,6 +251,35 @@ type blade struct {
 //     nửa lưỡi + bề rộng` thì không thanh nào với tới.
 //  3. So khoảng cách giữa hai TÂM lưỡi trước khi gọi `SegSegDist2`: một phép trừ và hai
 //     phép nhân, rẻ hơn hàng chục lần.
+// outerSlots trả khoảng chỉ số kiếm của **vòng ngoài cùng** [from, to).
+//
+// Spec mục 26: kiếm–kiếm chỉ xét vòng ngoài cùng. Lý do hình học: các vòng đồng tâm, vòng
+// ngoài có bán kính lớn nhất nên nó là thứ chạm nhau TRƯỚC — hai vòng trong chỉ gặp được
+// nhau sau khi hai vòng ngoài đã lồng vào nhau, mà lúc đó va chạm đã được tính rồi.
+//
+// Khác biệt về công sức là cả một bậc: Đạo Tổ có 1 050 kiếm chia 14 vòng, vòng ngoài cùng
+// chỉ 140 kiếm. Hai người Đạo Tổ đánh nhau là **1 050 × 1 050 → 140 × 140**, ít hơn 56 lần.
+// Một chi tiết không bỏ được: vòng ngoài cùng lúc sắp mài xong chỉ còn **vài cây kiếm lẻ**,
+// và hai cây lẻ trên hai vòng tròn lớn thì hiếm khi gặp nhau — mài tắc hẳn. Đo được: hai
+// Kim Đan 60 kiếm, tới tick 28 vòng ngoài còn đúng 2 kiếm thì hai tick cuối không va lần
+// nào, và sau 1 giây còn 32 kiếm thay vì 30 như §5.2 đòi.
+//
+// Nên lấy từ vòng ngoài cùng **đi xuống cho tới khi đủ một vòng đầy**: mặt chạm luôn liền
+// mạch. Thực tế là 1–2 vòng, vẫn ít hơn 14 vòng của Đạo Tổ cả chục lần.
+func outerSlots(ring Ring, g RingGeom) (int, int) {
+	rings := g.RingsFor(ring.Count)
+	if rings <= 0 {
+		return 0, 0
+	}
+	k := rings - 1
+	from := g.RingStart(k)
+	for k > 0 && ring.Count-from < g.RingCap(k) {
+		k--
+		from = g.RingStart(k)
+	}
+	return min(from, ring.Count), ring.Count
+}
+
 func (g *Game) sparseRingsTouch(a, b *Player) (Vec, bool) {
 	n := max(sweepSteps(a.Ring), sweepSteps(b.Ring))
 	reach := (a.Geom.Width + b.Geom.Width) / 2
@@ -258,10 +287,12 @@ func (g *Game) sparseRingsTouch(a, b *Player) (Vec, bool) {
 	outerA, outerB := a.Geom.Outer(), b.Geom.Outer()
 	ctA, stA := math.Cos(a.Ring.Tilt), math.Sin(a.Ring.Tilt)
 	ctB, stB := math.Cos(b.Ring.Tilt), math.Sin(b.Ring.Tilt)
+	fromA, toA := outerSlots(a.Ring, a.Geom)
+	fromB, toB := outerSlots(b.Ring, b.Geom)
 	for s := 0; s <= n; s++ {
 		pa, pb := sweepPhase(a.Ring, s, n), sweepPhase(b.Ring, s, n)
 		bb := g.bladeBuf[:0]
-		for j := 0; j < b.Ring.Count; j++ {
+		for j := fromB; j < toB; j++ {
 			// `length` lấy thẳng từ hình học, không đo lại bằng Hypot: cùng một con số mà
 			// Hypot một mình ăn 11% CPU server.
 			h, t, length := swordAtRot(b.Pos, pb, b.Ring, b.Geom, j, ctB, stB)
@@ -275,7 +306,7 @@ func (g *Game) sparseRingsTouch(a, b *Player) (Vec, bool) {
 		if len(bb) == 0 {
 			continue
 		}
-		for i := 0; i < a.Ring.Count; i++ {
+		for i := fromA; i < toA; i++ {
 			p1, q1, lenA := swordAtRot(a.Pos, pa, a.Ring, a.Geom, i, ctA, stA)
 			m1, half1 := p1.Add(q1).Mul(0.5), lenA/2
 			if lim := outerB + half1 + reach; m1.Dist2(b.Pos) > lim*lim {
@@ -329,9 +360,15 @@ func (g *Game) clash(a, b *Player, at Vec) {
 	// different realm nobody flips, so the stronger ring keeps grinding in the same direction.
 	if (!g.Cfg.Sword.FlipOnlySameRealm || ra == rb) && g.cooldownReady(pairKey(tagFlip, a.ID, b.ID, 0), g.Cfg.Sword.FlipCooldown) {
 		a.Ring.Dir, b.Ring.Dir = -a.Ring.Dir, -b.Ring.Dir
-		for _, p := range []*Player{a, b} {
-			g.emit(Event{Kind: "RingFlip", A: p.ID, N: int(p.Ring.Dir), X: float32(at.X), Y: float32(at.Y)})
-		}
+		// MỘT sự kiện cho một lần va, không phải một cho mỗi bên.
+		//
+		// Hai vòng va nhau ở đúng một điểm, và client xưa nay vẫn gộp hai sự kiện đó lại để
+		// vẽ đúng một tia lửa — tức là server gửi gấp đôi rồi client vứt một nửa. Đo được
+		// trong gói snapshot lớn nhất: **56 sự kiện RingFlip, 2,0 KB, 24% gói**.
+		//
+		// Chiều quay mới KHÔNG mất đi: nó nằm sẵn trong trường `d` của mỗi người, gửi mỗi
+		// gói snapshot. Sự kiện này chỉ để vẽ tia lửa và kêu tiếng va.
+		g.emit(Event{Kind: "RingFlip", A: a.ID, B: b.ID, N: int(a.Ring.Dir), X: float32(at.X), Y: float32(at.Y)})
 	}
 	out := ResolveClash(g.Cfg.Sword,
 		ClashSide{Realm: ra, Count: a.Ring.Count, Crack: a.Ring.Crack, DurMult: g.hardMult(a, "durability")},

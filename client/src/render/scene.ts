@@ -746,6 +746,10 @@ export class GameScene {
   private handleWorldEvent(e: GameEvent, now: number, mine: boolean, size: number): void {
     switch (e.k) {
       case 'ItemPicked':
+        // Viên Linh khí / Tiên khí được server GỘP: một sự kiện mang `n` viên, `b` là viên
+        // cuối. Quét qua bãi viên dày có thể nhặt mấy trăm viên trong một gói — nếu vẫn một
+        // sự kiện một viên thì gói snapshot phồng lên 21 KB và client kêu 400 tiếng chồng
+        // lên nhau. Giờ vẽ một vệt bay hút và kêu đúng một tiếng.
         if (e.b !== undefined) {
           this.pickedBy.set(e.b, e.a ?? 0); // syncItems biến nó thành hiệu ứng bay hút
         }

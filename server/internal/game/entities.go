@@ -167,6 +167,10 @@ type Player struct {
 	// nếu mỗi cây gãy bắn một sự kiện thì 20 người đánh nhau đẻ ra ~1900 sự kiện/giây —
 	// server vẫn nhẹ nhưng client phải dựng từng ấy hiệu ứng + tiếng động và tụt khung hình.
 	breakPending int
+	// orbPicked*: gộp lượt nhặt viên trong một tick (xem `flushOrbPickups`).
+	orbPicked     int
+	orbPickedID   uint32
+	orbPickedKind string
 	breakFlushAt float64
 }
 

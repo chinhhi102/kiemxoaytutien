@@ -67,7 +67,7 @@ type ObstacleState struct {
 // Không có nó thì client mới gặp server cũ sẽ đọc rác rồi **đứng hình không báo gì** — đã
 // dính đúng một lần: client build 16:40 nói `mood` là chỉ số, server chạy từ 14:56 vẫn gửi
 // chuỗi, và người chơi chỉ thấy game treo.
-const ProtocolVersion = 3
+const ProtocolVersion = 4
 
 type Welcome struct {
 	T         string          `msgpack:"t"`
@@ -139,22 +139,65 @@ type PlayerState struct {
 // MonsterState: `k`, `mx`, `r` KHÔNG BAO GIỜ đổi trong đời một con quái, nên chỉ gửi lần đầu
 // client thấy nó (spec mục 27). Trước đây gửi lại 20 lần/giây: riêng chuỗi `kind` đã 10 byte
 // mỗi con mỗi gói.
+// Toạ độ quái và vật phẩm gửi dạng **số nguyên đơn vị thế giới** (`uint16`), không phải
+// `float32` (spec mục 27 "lượng tử hoá").
+//
+// Bản đồ rộng 12 000 nên lọt gọn trong uint16, và sai số tối đa nửa đơn vị — trên màn hình
+// là 1/60 bán kính thân người, không ai thấy. Đổi lại mỗi toạ độ còn 3 byte thay vì 5.
+//
+// ⚠ Cố ý **không** lượng tử hoá toạ độ NGƯỜI CHƠI: client dùng vị trí server gửi về để đối
+// chiếu với phần nó tự dự đoán (§8.2a). Thêm nửa đơn vị sai số vào đó là mỗi gói lại lệch
+// một ít, và bộ đếm "hiệu chỉnh/giây" vừa kéo về 0 sẽ chạy lại. Người chơi cũng chỉ chiếm
+// 11% gói, không đáng để đánh đổi.
 type MonsterState struct {
-	ID   uint32  `msgpack:"id"`
-	X    float32 `msgpack:"x"`
-	Y    float32 `msgpack:"y"`
-	HP   int     `msgpack:"hp"`
+	ID uint32 `msgpack:"id"`
+	X  uint16 `msgpack:"x"`
+	Y  uint16 `msgpack:"y"`
+	// HP: **chỉ gửi khi ĐỔI** (spec mục 27 "delta snapshot"). Thiếu trường này = máu giữ
+	// nguyên. Quái chết bị xoá khỏi danh sách nên máu luôn ≥ 1, không nhầm với 0 được.
+	HP   int     `msgpack:"hp,omitempty"`
 	Kind string  `msgpack:"k,omitempty"`
 	Max  int     `msgpack:"mx,omitempty"`
 	R    float32 `msgpack:"r,omitempty"`
 }
 
 type ItemState struct {
-	ID    uint32  `msgpack:"id"`
-	X     float32 `msgpack:"x"`
-	Y     float32 `msgpack:"y"`
-	Kind  string  `msgpack:"k"`
+	ID uint32 `msgpack:"id"`
+	X  uint16 `msgpack:"x"`
+	Y  uint16 `msgpack:"y"`
+	// Kind gửi dạng CHỈ SỐ trong `ItemKinds`, không phải chuỗi: "skill_scroll" tốn 13 byte
+	// mỗi viên mỗi gói, mà một gói có thể có 60 vật phẩm mới vào tầm nhìn.
+	Kind  uint8   `msgpack:"k"`
 	Value float32 `msgpack:"v,omitempty"`
+}
+
+// ItemKinds: thứ tự này là GIAO THỨC. Thêm loại mới thì thêm vào CUỐI, đừng chèn giữa —
+// client tra theo chỉ số (`client/src/net/protocol.ts` ITEM_KINDS phải khớp từng dòng).
+var ItemKinds = []string{"orb", "sword", "bundle", "chest", "tien_khi", "skill_scroll",
+	"spin", "haste", "magnet", "hard", "shield", "exp2", "stealth"}
+
+var itemKindIndex = func() map[string]uint8 {
+	m := make(map[string]uint8, len(ItemKinds))
+	for i, k := range ItemKinds {
+		m[k] = uint8(i)
+	}
+	return m
+}()
+
+// ItemKindID tra chỉ số của một loại vật phẩm. Loại lạ (chưa thêm vào bảng) trả 0 và sẽ vẽ
+// như viên Linh khí — xấu nhưng không làm sập client.
+func ItemKindID(kind string) uint8 { return itemKindIndex[kind] }
+
+// QuantPos kẹp và làm tròn một toạ độ thế giới về uint16.
+func QuantPos(v float64) uint16 {
+	switch {
+	case v <= 0:
+		return 0
+	case v >= 65535:
+		return 65535
+	default:
+		return uint16(v + 0.5)
+	}
 }
 
 // Snapshot is sent at snapshot_hz. Items are diffed per client (added / removed).

@@ -27,6 +27,55 @@ import (
 )
 
 // client đóng vai một người chơi: đếm byte nhận và đo ping đúng cách — gửi `ping` rồi tính
+// snapParts mổ một gói snapshot ra từng phần và trả byte của mỗi phần.
+//
+// Cách đo: giải mã gói thành map, rồi mã hoá lại TỪNG trường một và đếm byte. Không chính
+// xác tuyệt đối (mỗi lần mã hoá lại có thêm vài byte khung map), nhưng đủ để biết phần nào
+// chiếm chỗ — và đó là tất cả những gì cần để chọn chỗ tối ưu.
+func snapParts(b []byte) (map[string]int, map[string]int) {
+	var m map[string]any
+	if err := netproto.Decode(b, &m); err != nil {
+		return nil, nil
+	}
+	parts, ents := map[string]int{}, map[string]int{}
+	for k, v := range m {
+		enc, err := netproto.Encode(map[string]any{k: v})
+		if err != nil {
+			continue
+		}
+		parts[k] = len(enc)
+		arr, ok := v.([]any)
+		if !ok {
+			continue
+		}
+		ents[k] = len(arr)
+		if k != "ev" {
+			continue
+		}
+		// Sự kiện chiếm phần lớn gói, nên phải biết LOẠI nào — "293 sự kiện" không nói được
+		// gì, còn "250 lượt va kiếm" thì chỉ thẳng vào chỗ phải sửa.
+		for _, e := range arr {
+			em, ok := e.(map[string]any)
+			if !ok {
+				continue
+			}
+			kind, _ := em["k"].(string)
+			sub, _ := netproto.Encode(e)
+			parts["ev:"+kind] += len(sub)
+			ents["ev:"+kind]++
+			// Với ItemPicked còn tách theo LOẠI vật phẩm: "395 lượt nhặt" không nói được gì,
+			// còn "395 lượt nhặt kiếm" thì chỉ thẳng vào chỗ phải sửa.
+			if kind == "ItemPicked" {
+				if s, ok := em["s"].(string); ok {
+					parts["  ·"+s] += len(sub)
+					ents["  ·"+s]++
+				}
+			}
+		}
+	}
+	return parts, ents
+}
+
 // lúc `pong` quay về, không đợi vòng lặp vẽ (spec §13.6).
 type client struct {
 	bytes   int64
@@ -34,6 +83,12 @@ type client struct {
 	snapMax int
 	pings   []float64
 	sentAt  map[float64]time.Time
+	// parts: gói snapshot LỚN NHẤT được mổ ra từng phần, byte mỗi phần.
+	//
+	// Không có bảng này thì "snapshot 25 KB" chỉ là một con số để lo lắng: tối ưu lượng tử
+	// hoá toạ độ trong khi 90% byte nằm ở danh sách vật phẩm thì mất công mà không đổi gì.
+	parts map[string]int
+	ents  map[string]int
 }
 
 func (c *client) Send(b []byte) bool {
@@ -48,6 +103,7 @@ func (c *client) Send(b []byte) bool {
 			c.snaps++
 			if len(b) > c.snapMax {
 				c.snapMax = len(b)
+				c.parts, c.ents = snapParts(b)
 			}
 		case "pong":
 			if at, ok := c.sentAt[head.C]; ok {
@@ -204,11 +260,13 @@ func report(cs []*client, durs []float64, wall, secs float64, n int) {
 	}
 	var bytes int64
 	maxSnap := 0
+	var parts, ents map[string]int
 	var pings []float64
 	for _, c := range cs {
 		bytes += c.bytes
 		if c.snapMax > maxSnap {
 			maxSnap = c.snapMax
+			parts, ents = c.parts, c.ents
 		}
 		pings = append(pings, c.pings...)
 	}
@@ -236,4 +294,24 @@ func report(cs []*client, durs []float64, wall, secs float64, n int) {
 	row("Ping p95 (không tính địa lý)", fmt.Sprintf("%.2f ms", pingP95), "< 20 ms", pingP95 < 20)
 	fmt.Printf("\n%d nhân vật · CPU dùng %.0f%% thời gian thực · %d tick đo\n",
 		n, wall/secs*100, len(durs))
+
+	if len(parts) > 0 {
+		fmt.Println("\nGói snapshot LỚN NHẤT mổ ra từng phần:")
+		keys := make([]string, 0, len(parts))
+		for k := range parts {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool { return parts[keys[i]] > parts[keys[j]] })
+		for _, k := range keys {
+			if parts[k] < 16 {
+				continue // bỏ qua mấy trường một byte, chỉ làm rối bảng
+			}
+			n := ""
+			if ents[k] > 0 {
+				n = fmt.Sprintf(" · %d mục, %.0f byte/mục", ents[k], float64(parts[k])/float64(ents[k]))
+			}
+			fmt.Printf("  %-6s %7.1f KB (%2.0f%%)%s\n",
+				k, float64(parts[k])/1024, float64(parts[k])*100/float64(maxSnap), n)
+		}
+	}
 }

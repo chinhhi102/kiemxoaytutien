@@ -91,6 +91,7 @@ func (g *Game) onDeathClear(p *Player) {
 	p.SkillCharges = 0
 	p.Vel = Vec{}
 	p.shellOn = false
+	p.orbPicked, p.orbPickedID, p.orbPickedKind = 0, 0, ""
 	g.ClearStatuses(p)
 }
 

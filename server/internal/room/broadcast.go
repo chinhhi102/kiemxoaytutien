@@ -81,12 +81,14 @@ func (r *Room) snapshotFor(z *Zone, c *Client, viewer *game.Player, events []gam
 		if len(s.Players)+len(s.Monsters) >= maxEntities {
 			break // trần entity động mỗi gói (spec mục 27)
 		}
-		ms := netproto.MonsterState{ID: m.ID, X: float32(m.Pos.X), Y: float32(m.Pos.Y), HP: m.HP}
-		if !c.knownMonsters[m.ID] {
+		ms := netproto.MonsterState{ID: m.ID, X: netproto.QuantPos(m.Pos.X), Y: netproto.QuantPos(m.Pos.Y)}
+		if last, seen := c.knownMonsters[m.ID]; !seen {
 			// Lần đầu thấy: gửi kèm loại, máu tối đa và bán kính — ba thứ không bao giờ đổi.
-			c.knownMonsters[m.ID] = true
-			ms.Kind, ms.Max, ms.R = m.Kind, m.MaxHP, float32(m.R)
+			ms.Kind, ms.Max, ms.R, ms.HP = m.Kind, m.MaxHP, float32(m.R), m.HP
+		} else if last != m.HP {
+			ms.HP = m.HP // chỉ gửi máu khi ĐỔI (spec mục 27); thiếu trường = giữ nguyên
 		}
+		c.knownMonsters[m.ID] = m.HP
 		s.Monsters = append(s.Monsters, ms)
 	}
 	for id := range c.knownMonsters {
@@ -151,11 +153,19 @@ func (r *Room) diffItems(z *Zone, c *Client, viewer *game.Player, s *netproto.Sn
 	// `known[slot]` bằng id của viên MỚI, rồi vòng quét thấy "slot này có chủ hợp lệ" và
 	// không bao giờ báo client xoá viên CŨ — người chơi nhặt xong mà viên vẫn nằm đó mãi.
 	// Quét trước thì viên cũ được báo xoá, slot trả về 0, rồi viên mới mới được thêm.
-	for slot, id := range known {
+	// Duyệt DANH SÁCH SLOT ĐANG BIẾT, không duyệt cả mảng slot của bản đồ.
+	//
+	// `known` dài bằng tổng số slot (hàng nghìn) nhưng mỗi client chỉ biết tối đa chừng 150
+	// vật phẩm — trần entity mỗi gói. Quét cả mảng là 60 client × 3 000 slot × 20 lần/giây
+	// ≈ 3,6 triệu lượt đọc mỗi giây, gần hết trong số đó chỉ để thấy số 0. `knownSlots` giữ
+	// đúng những slot khác 0 nên vòng này ngắn đi khoảng hai mươi lần.
+	kept := c.knownSlots[:0]
+	for _, slot := range c.knownSlots {
+		id := known[slot]
 		if id == 0 {
 			continue
 		}
-		it := g.ItemBySlot(slot)
+		it := g.ItemBySlot(int(slot))
 		ok := it != nil && it.ID == id
 		if ok {
 			dx, dy := it.Pos.X-vp.X, it.Pos.Y-vp.Y
@@ -164,8 +174,11 @@ func (r *Room) diffItems(z *Zone, c *Client, viewer *game.Player, s *netproto.Sn
 		if !ok {
 			known[slot] = 0
 			s.ItemsRemoved = append(s.ItemsRemoved, id)
+			continue
 		}
+		kept = append(kept, slot)
 	}
+	c.knownSlots = kept
 	cands := z.itemBuf[:0]
 	g.ItemsNear(vp, hw, hh, func(it *game.Item) {
 		if known[it.Slot()] == it.ID {
@@ -186,8 +199,10 @@ func (r *Room) diffItems(z *Zone, c *Client, viewer *game.Player, s *netproto.Sn
 		}
 		budget -= itemWireBytes
 		known[cd.it.Slot()] = cd.it.ID
-		s.ItemsAdded = append(s.ItemsAdded, netproto.ItemState{ID: cd.it.ID, X: float32(cd.it.Pos.X), Y: float32(cd.it.Pos.Y),
-			Kind: cd.it.Kind, Value: float32(cd.it.Value)})
+		c.knownSlots = append(c.knownSlots, int32(cd.it.Slot()))
+		s.ItemsAdded = append(s.ItemsAdded, netproto.ItemState{
+			ID: cd.it.ID, X: netproto.QuantPos(cd.it.Pos.X), Y: netproto.QuantPos(cd.it.Pos.Y),
+			Kind: netproto.ItemKindID(cd.it.Kind), Value: float32(cd.it.Value)})
 	}
 }
 
@@ -210,7 +225,7 @@ func (r *Room) eventsFor(z *Zone, viewer *game.Player, events []game.Event, seen
 
 // playerEvents are attributed to player A and hidden when A is not visible to the viewer.
 var playerEvents = map[string]bool{"LevelUp": true, "Breakthrough": true, "RealmDrop": true,
-	"RingFlip": true, "SwordBreak": true, "BuffStart": true, "BuffEnd": true, "Emote": true, "TeleportIn": true}
+	"SwordBreak": true, "BuffStart": true, "BuffEnd": true, "Emote": true, "TeleportIn": true}
 
 func (r *Room) eventVisible(z *Zone, viewer *game.Player, e game.Event, seen map[uint32]bool) bool {
 	if !z.G.InView(viewer, game.Vec{X: float64(e.X), Y: float64(e.Y)}) {
@@ -219,7 +234,10 @@ func (r *Room) eventVisible(z *Zone, viewer *game.Player, e game.Event, seen map
 	if playerEvents[e.Kind] {
 		return seen[e.A]
 	}
-	if e.Kind == "Hit" {
+	// Hai bên, thấy bên nào cũng đủ. RingFlip giờ là MỘT sự kiện cho cả cặp (xem `clash`),
+	// nên nếu chỉ xét bên A thì người đứng cạnh B sẽ không thấy tia lửa của chính trận va
+	// ngay trước mặt mình.
+	if e.Kind == "Hit" || e.Kind == "RingFlip" {
 		return seen[e.A] || seen[e.B]
 	}
 	return true

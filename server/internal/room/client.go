@@ -38,8 +38,12 @@ type Client struct {
 	// id chứ không lưu bool vì slot được DÙNG LẠI: viên mới nhận slot của viên cũ thì id
 	// khác nhau, so id là biết ngay client chưa thấy viên mới này.
 	knownItems []uint32
-	// knownMonsters: đã gửi phần tĩnh (loại, máu tối đa, bán kính) của con quái này chưa.
-	knownMonsters map[uint32]bool
+	// knownSlots: danh sách GỌN các slot đang khác 0, để vòng quét xoá khỏi phải duyệt cả
+	// mảng `knownItems` dài hàng nghìn phần tử (xem `diffItems`).
+	knownSlots []int32
+	// knownMonsters: máu LẦN CUỐI đã gửi cho client này, theo id quái. Có mặt trong map = đã
+	// gửi phần tĩnh (loại, máu tối đa, bán kính). Dùng để chỉ gửi máu khi nó đổi (spec mục 27).
+	knownMonsters map[uint32]int
 
 	inMu   sync.Mutex
 	seq    uint32
@@ -59,8 +63,9 @@ func NewClient(c Conn, debug bool) *Client {
 // resetKnown xoá trí nhớ "đã gửi gì cho client này" — gọi khi vào phòng và khi sang khu
 // khác, vì sang khu là đổi hẳn bản đồ, mọi id cũ không còn nghĩa gì.
 func (c *Client) resetKnown() {
-	c.knownPlayers, c.knownMonsters = map[uint32]bool{}, map[uint32]bool{}
+	c.knownPlayers, c.knownMonsters = map[uint32]bool{}, map[uint32]int{}
 	c.knownItems = c.knownItems[:0]
+	c.knownSlots = c.knownSlots[:0]
 }
 
 func (c *Client) SetInput(in netproto.Input) {

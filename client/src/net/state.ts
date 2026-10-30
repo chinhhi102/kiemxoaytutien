@@ -6,6 +6,7 @@ import {
   type GameEvent,
   type GameMap,
   type ItemState,
+  itemKind,
   type MonsterState,
   type PlayerState,
   type Snapshot,
@@ -108,8 +109,10 @@ export class ClientWorld {
     this.lastSnapAt = performance.now();
     this.updatePlayers(s);
     this.updateMonsters(s);
+    // Đổi chỉ số loại → tên ngay tại đây, một lần duy nhất. Phần còn lại của client vẫn
+    // so `k === 'orb'` như cũ (xem ghi chú ở `ItemState`).
     for (const it of s.ia ?? []) {
-      this.items.set(it.id, it);
+      this.items.set(it.id, { id: it.id, x: it.x, y: it.y, k: itemKind(it.k), v: it.v });
     }
     for (const id of s.ir ?? []) {
       this.items.delete(id);
@@ -153,8 +156,10 @@ export class ClientWorld {
       // Loại, máu tối đa và bán kính chỉ được gửi LẦN ĐẦU (spec mục 27) — chúng không bao
       // giờ đổi. Các gói sau thiếu ba trường đó, phải lấy lại từ gói trước.
       const prev = buf[buf.length - 1]?.s;
+      // `hp` cũng chỉ gửi khi ĐỔI (delta snapshot, spec mục 27) — quái đứng yên gặm cỏ thì
+      // gói nào cũng thiếu trường đó, phải giữ lại máu cũ chứ không được coi là 0.
       const full: MonsterState = prev
-        ? { ...m, k: m.k || prev.k, mx: m.mx || prev.mx, r: m.r || prev.r }
+        ? { ...m, k: m.k || prev.k, mx: m.mx || prev.mx, r: m.r || prev.r, hp: m.hp ?? prev.hp }
         : m;
       buf.push({ t: s.tm, s: full });
       if (buf.length > SNAP_KEEP) {

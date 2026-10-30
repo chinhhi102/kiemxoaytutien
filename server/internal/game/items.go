@@ -137,9 +137,46 @@ func (g *Game) canAbsorb(p *Player, it *Item) bool {
 // ItemSkillScroll là vật phẩm Bí Kíp (spec §6.3).
 const ItemSkillScroll = "skill_scroll"
 
+// Viên Linh khí / Tiên khí **gộp thành một sự kiện mỗi người mỗi tick**, và chỉ gửi cho
+// chính người nhặt. Hai lớp, vì một lớp không đủ:
+//
+//  1. Chỉ gửi cho người nhặt — đo được: trong gói snapshot lớn nhất, `ItemPicked` chiếm
+//     **173 sự kiện / 8,1 KB / 74% gói**, do sáu mươi nhân vật hút viên liên tục và mỗi
+//     lượt phát một sự kiện 48 byte cho mọi người trong tầm nhìn.
+//  2. Nhưng lọc theo người xem vẫn chưa đủ: một người Đạo Tổ (scale 6, vòng nhặt 540) quét
+//     qua bãi viên dày sinh ra **443 lượt nhặt của riêng mình trong một gói** — vẫn 21 KB.
+//     Nên phải gộp lại, đúng cách `flushSwordBreaks` đã làm với kiếm gãy.
+//
+// Người ngoài không mất gì đáng kể: viên biến mất vẫn báo qua danh sách `ir` (5 byte), chỉ
+// mất hiệu ứng "viên bay hút vào người khác" — một chấm nhỏ cách đó cả nghìn đơn vị. Vật
+// phẩm hiếm (kiếm, rương, buff, Bí Kíp) vẫn phát nguyên vẹn cho cả phòng: chúng đáng xem
+// và chỉ lác đác vài lượt mỗi phút.
+func isOrbKind(kind string) bool { return kind == "orb" || kind == ItemTienKhi }
+
+// flushOrbPickups phát một sự kiện gộp cho mỗi người vừa nhặt viên trong tick này.
+//
+// `B` mang id viên CUỐI CÙNG để client còn vẽ được một vệt bay hút, `N` là tổng số viên để
+// client biết chỉ kêu một tiếng thay vì bốn trăm tiếng.
+func (g *Game) flushOrbPickups() {
+	for _, p := range g.PlayerList() {
+		if p.orbPicked == 0 {
+			continue
+		}
+		g.emit(Event{Kind: "ItemPicked", A: p.ID, B: p.orbPickedID, S: p.orbPickedKind,
+			N: p.orbPicked, To: p.ID, X: float32(p.Pos.X), Y: float32(p.Pos.Y)})
+		p.orbPicked, p.orbPickedID, p.orbPickedKind = 0, 0, ""
+	}
+}
+
 func (g *Game) pickup(p *Player, it *Item) {
 	g.removeItem(it)
-	g.emit(Event{Kind: "ItemPicked", A: p.ID, B: it.ID, S: it.Kind, X: float32(it.Pos.X), Y: float32(it.Pos.Y)})
+	if isOrbKind(it.Kind) {
+		p.orbPicked++
+		p.orbPickedID, p.orbPickedKind = it.ID, it.Kind
+	} else {
+		g.emit(Event{Kind: "ItemPicked", A: p.ID, B: it.ID, S: it.Kind,
+			X: float32(it.Pos.X), Y: float32(it.Pos.Y)})
+	}
 	switch it.Kind {
 	case "orb":
 		g.GainExp(p, it.Value, true)
