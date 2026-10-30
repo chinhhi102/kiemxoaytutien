@@ -31,9 +31,13 @@ func (r *Room) Debug(c *Client, d netproto.Debug) {
 			// Linh khí nữa (§3.4) nên phải cấp thẳng Tiên khí, không thì phím test tắc ở đó
 			// và không bao giờ thử được Tiên giới.
 			if z.G.BanksTienKhi(p) {
-				need := z.G.Prog.TienNextAt(z.G.TienRealmOf(p))
-				if need > 0 {
-					z.G.GainTienKhi(p, need-p.TienKhi)
+				// Cấp đủ Tiên khí để vượt TRẦN cảnh giới hiện tại — vượt trần mới lên cảnh
+				// giới mới (spec v5.7). Chưa có Tiên khí nào thì một điểm là vào Chân Tiên.
+				idx := z.G.TienRealmOf(p)
+				if ceil := z.G.Prog.TienCeil(idx); idx < 0 {
+					z.G.GainTienKhi(p, 1)
+				} else if idx+1 < z.G.Prog.TienCount() {
+					z.G.GainTienKhi(p, ceil+1-p.TienKhi)
 				}
 				return
 			}

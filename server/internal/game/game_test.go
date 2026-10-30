@@ -63,8 +63,9 @@ func hasEvent(evs []Event, kind string) bool {
 	return false
 }
 
-// Spec §5.1: a hit drops one whole realm and keeps the tier and progress (Trúc Cơ 2 → Luyện Khí 2).
-func TestBodyHitDropsOneRealmKeepingTier(t *testing.T) {
+// Spec v5.8 §5.1: bị chém rớt 1 đại cảnh giới và thanh về SÀN cảnh giới mới (tầng 1, 0%).
+// Trúc Cơ tầng 2 → Luyện Khí tầng 1, 0% — không còn giữ tầng như bản cũ.
+func TestBodyHitDropsToRealmFloor(t *testing.T) {
 	g := quietGame(t, nil)
 	a := g.AddPlayer(SpawnOptions{Name: "A", Level: 0, Swords: 1})
 	b := g.AddPlayer(SpawnOptions{Name: "B", Level: 11, Swords: 1})
@@ -73,9 +74,9 @@ func TestBodyHitDropsOneRealmKeepingTier(t *testing.T) {
 	place(g, b, bladeMid(a), math.Pi/2)
 	before := b.TotalExp
 	g.resolveSwordBody()
-	want := g.Prog.Threshold(1) + 0.4*g.Prog.ExpNeeded(1)
-	if b.Level != 1 || math.Abs(b.TotalExp-want) > 1e-9 {
-		t.Fatalf("B level %d exp %v, want Luyện Khí 2 (level 1) exp %v", b.Level, b.TotalExp, want)
+	want := g.Prog.Threshold(0) // sàn Luyện Khí = 0
+	if b.Level != 0 || math.Abs(b.TotalExp-want) > 1e-9 {
+		t.Fatalf("B level %d exp %v, muốn Luyện Khí tầng 1 (level 0) exp %v", b.Level, b.TotalExp, want)
 	}
 	loss := before - want
 	if math.Abs(a.TotalExp-loss*0.5) > 1e-9 {

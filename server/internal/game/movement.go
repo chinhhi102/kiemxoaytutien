@@ -54,24 +54,18 @@ func (g *Game) tienFloor(p *Player) float64 {
 	return g.Prog.TienEntry(idx)
 }
 
-// tienStepCost là lượng Tiên khí của BƯỚC hiện tại — mốc để tính 8% mỗi giây.
+// tienBurnPerSec là lượng Tiên khí đốt mỗi giây: 8% **độ rộng khoảng** của cảnh giới đang
+// đứng (spec v5.7 §4.1c) → Chân Tiên 8, Kim Tiên 16, Thái Ất 24, Đại La 32, Đạo Tổ 40.
 //
-// Lấy `tien_khi_per_step[idx]`, tức bước đã ĐƯA họ tới cảnh giới đang đứng, không phải bước
-// đi tiếp. Spec chốt cách đọc này bằng chính ví dụ của nó: "Đạo Tổ: 8% × 500 = 40/giây", mà
-// 500 là bước thứ 5 — Đạo Tổ không còn bước đi tiếp nào nữa.
-func (g *Game) tienStepCost(p *Player) float64 {
-	steps := g.Cfg.Cultivation.TienKhiPerStep
-	if len(steps) == 0 {
-		return 0
-	}
+// Theo độ rộng khoảng chứ không theo một con số chung: cảnh giới càng cao thì khoảng càng
+// rộng, nên chạy nước rút luôn tốn đúng 8% quãng đường của chính cảnh giới ấy — người ở
+// đỉnh không được chạy rẻ hơn người mới vào.
+func (g *Game) tienBurnPerSec(p *Player) float64 {
 	idx := g.TienRealmOf(p)
 	if idx < 0 {
-		idx = 0 // Đại Thừa tầng 10 đang đi bước đầu tiên (lên Chân Tiên)
+		return 0
 	}
-	if idx >= len(steps) {
-		idx = len(steps) - 1
-	}
-	return steps[idx]
+	return g.Cfg.Burn.TienFracPerSec * g.Prog.TienWidth(idx)
 }
 
 // Burning reports whether the player is actually burning essence right now: they asked for
@@ -100,7 +94,7 @@ func (g *Game) burnExp(p *Player, dt float64) {
 		return
 	}
 	if g.BanksTienKhi(p) {
-		cost := g.Cfg.Burn.TienFracPerSec * g.tienStepCost(p) * dt
+		cost := g.tienBurnPerSec(p) * dt
 		after := math.Max(g.tienFloor(p), p.TienKhi-cost)
 		// Dùng chung `BurnedExp` cho cả hai đường tu: màn Tổng kết hỏi "đã thiêu đốt bao
 		// nhiêu tu vi", và với người Tiên giới thì tu vi của họ chính là Tiên khí.

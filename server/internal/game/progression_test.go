@@ -114,12 +114,37 @@ func TestMaxSwords(t *testing.T) {
 	}
 }
 
-func TestDropRealmKeepsTierAndProgress(t *testing.T) {
+// Spec v5.8 §5.1: bị chém thì rớt 1 đại cảnh giới và thanh về **MỨC SÀN** của cảnh giới mới
+// (tầng 1, 0%) — không còn giữ tầng và % tiến độ như bản cũ.
+func TestDropRealmGoesToRealmFloor(t *testing.T) {
 	p := testProg(t)
-	exp := p.Threshold(11) + 0.25*p.ExpNeeded(11) // Trúc Cơ 2, 25% through
-	got := p.DropRealmExp(exp)
-	want := p.Threshold(1) + 0.25*p.ExpNeeded(1) // Luyện Khí 2, 25% through
-	if math.Abs(got-want) > 1e-9 || p.LevelFromExp(got) != 1 {
-		t.Fatalf("drop → %v (level %d), want %v (level 1)", got, p.LevelFromExp(got), want)
+	for _, c := range []struct {
+		name string
+		exp  float64
+		want float64
+	}{
+		// Trúc Cơ tầng 2, 25% → Luyện Khí tầng 1, 0%.
+		{"Trúc Cơ t2 → Luyện Khí t1", p.Threshold(11) + 0.25*p.ExpNeeded(11), 0},
+		// Kim Đan tầng 7 → Trúc Cơ tầng 1 0% = 1 360 (con số spec ghi thẳng trong §5.1).
+		{"Kim Đan t7 → Trúc Cơ t1", p.Threshold(26) + 0.9*p.ExpNeeded(26), 1360},
+	} {
+		got := p.DropRealmExp(c.exp)
+		if math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%s: ra %.0f, muốn %.0f", c.name, got, c.want)
+		}
+		if tier := p.Tier(p.LevelFromExp(got)); got > 0 && tier != 0 {
+			t.Errorf("%s: rơi vào tầng %d, phải là tầng 1 (chỉ số 0)", c.name, tier+1)
+		}
+	}
+}
+
+// Sàn từng cảnh giới, ghi thẳng trong spec v5.8 §5.1. Khoá lại vì `realm_mult` đổi một chữ
+// số là cả bảng này lệch mà không có gì báo.
+func TestRealmFloors(t *testing.T) {
+	p := testProg(t)
+	for r, want := range []float64{0, 1360, 4080, 9520, 20400, 42160, 85680, 172720, 346800} {
+		if got := p.Threshold(r * 10); math.Abs(got-want) > 1e-9 {
+			t.Errorf("sàn cảnh giới %d = %.0f, spec ghi %.0f", r, got, want)
+		}
 	}
 }

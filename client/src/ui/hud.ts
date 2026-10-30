@@ -274,8 +274,17 @@ export class Hud {
     let frac: number;
     if (tien) {
       const need = me.tn ?? 0;
-      frac = need > 0 ? Math.min(1, (me.th ?? 0) / need) : 1;
-      this.expLabel.textContent = need > 0 ? STR.tienKhi(me.th ?? 0, need) : STR.tienMax;
+      const have = me.th ?? 0;
+      frac = need > 0 ? Math.min(1, have / need) : 1;
+      this.expLabel.textContent = need > 0 ? STR.tienKhi(have, need) : STR.tienMax;
+      // Đạo Tổ nạp đầy trần (spec v5.7 §3.4): từ lúc này Tiên khí nhặt thêm mới đổi sang
+      // Uy Danh. Phải báo rõ, vì trước mốc đó nhặt bao nhiêu cũng không thấy Uy Danh tăng
+      // và người chơi sẽ tưởng luật hỏng.
+      const full = need > 0 && have >= need - 1e-9 && tienIndex(this.cfg, r) === this.cfg.cultivation.tien_realms.length - 1;
+      this.expBar.classList.toggle('tien-full', full);
+      if (full) {
+        this.expLabel.textContent = STR.tienOverflow;
+      }
     } else {
       const { from, to } = prog(me.L);
       frac = to > from ? Math.min(1, (me.xp - from) / (to - from)) : 1;

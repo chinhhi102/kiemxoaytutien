@@ -4,6 +4,12 @@
 > Mọi con số nằm trong `config/game.json` (mục 16) — **không hardcode**.
 > Art/animation prompts: `docs/ART_PROMPTS.md`. Hướng dẫn setup: `docs/SETUP_GUIDE.md`.
 
+**Thay đổi v5.9:** làm rõ: chém người Tiên giới luôn rơi 30% Tiên khí mất ra đất, bất kể người chém là ai (§3.4).
+
+**Thay đổi v5.8:** bị chém rớt 1 đại cảnh giới và thanh về **mức sàn** (tầng 1, 0%) của cảnh giới mới, không giữ tầng nữa (§5.1, §3.4).
+
+**Thay đổi v5.7:** Tiên giới tính theo tổng Tiên khí (Chân Tiên 1–100 … Đạo Tổ 1 001–1 500), vào Tiên giới cần Đại Thừa 10 đầy thanh; Đạo Tổ nạp đầy 1 500 mới đổi Uy Danh, Thiêu Đốt được; bỏ cân bằng theo tỉ lệ thắng 1-đấu-1 (§3.4, §4.1c, §6.3).
+
 **Thay đổi v5.6:** Thiêu Đốt bật thêm bằng nháy đúp giữ / chạm 2 lần giữ; Tiên giới đốt Tiên khí (§4.1c); bảng hướng dẫn có dòng Kỹ năng (§18.1).
 
 **Thay đổi v5.5:** chỉnh kỹ năng — A Hớn hồi 20% kiếm tối đa; Bà Tám đẩy 500; Ông Ba Võng bán kính 500; Thằng Mập bịt mắt 5s + không nhặt đồ; Cô Ba trượt = choáng 1s; Shipper ×3 trong 5s, xuyên mọi vật cản trừ biên (§6.3).
@@ -133,41 +139,52 @@ exp_needed(r, s) = round(100 * 2^r * (1 + 0.08 * s))      // realm_mult = 2.0: m
 
 - Lưu `total_exp` cộng dồn, level suy ra từ bảng ngưỡng tích lũy tính sẵn.
 - **Tên hiển thị**: dưới Tiên giới, mọi chữ "EXP" người chơi nhìn thấy đổi thành **Linh khí** (thanh Linh khí, viên Linh khí, "+20 Linh khí"). Trong code vẫn giữ tên `exp`.
-- Đạt Đại Thừa tầng 10: `total_exp` dừng ở trần, EXP nhặt thêm bị bỏ (xếp hạng dùng Uy Danh §11, không dùng EXP). Lên tiếp phải hấp thụ **Tiên khí** (§3.4).
+- Đại Thừa tầng 10 **đầy thanh** (`total_exp = 694 960`, trần): Linh khí nhặt thêm bị bỏ. Lên tiếp phải hấp thụ **Tiên khí** (§3.4). Đại Thừa tầng 10 chưa đầy thanh thì vẫn nhặt Linh khí như thường.
 - Lên tầng: glow nhỏ. **Đột phá cảnh giới**: anim `breakthrough`, sét, camera rung, đổi skin kiếm theo cảnh giới, nhân vật quanh đó hiện emote kinh ngạc.
 
 ### 3.4 Tiên giới — lên cảnh giới bằng Tiên khí
 
-Sau Đại Thừa tầng 10 có thêm 5 cảnh giới. **Không dùng Linh khí (EXP)**, chỉ lên được bằng **Tiên khí** — loại viên đặc biệt chỉ phun ra từ các **Đài Tiên Khí** trên bản đồ (§8.5). Tiên giới **không chia tầng**. (Cơ chế "sát mạng" của bản trước đã bỏ.)
+Sau Đại Thừa có thêm 5 cảnh giới. **Không dùng Linh khí (EXP)**, chỉ lên được bằng **Tiên khí** — loại viên đặc biệt chỉ phun ra từ các **Đài Tiên Khí** trên bản đồ (§8.5). Tiên giới **không chia tầng**. Cảnh giới Tiên được xác định thẳng từ **tổng Tiên khí đang có** (`tien_khi`, cộng dồn):
 
-| r | Cảnh giới | Tiên khí cần (từ cảnh giới trước) | Cộng dồn | Kiếm tối đa | Số vòng | Scale |
+| r | Cảnh giới | Tiên khí (cộng dồn) | Trần | Kiếm tối đa | Số vòng | Scale |
 |---|---|---|---|---|---|---|
-| 9 | Chân Tiên | 100 | 100 | 550 | 10 | 5.2 |
-| 10 | Kim Tiên | 200 | 300 | 660 | 11 | 5.4 |
-| 11 | Thái Ất Ngọc Tiên | 300 | 600 | 780 | 12 | 5.6 |
-| 12 | Đại La Kim Tiên | 400 | 1 000 | 910 | 13 | 5.8 |
-| 13 | Đạo Tổ | 500 | 1 500 | 1 050 | 14 | 6.0 |
+| 9 | Chân Tiên | 1 – 100 | 100 | 550 | 10 | 5.2 |
+| 10 | Kim Tiên | 101 – 300 | 300 | 660 | 11 | 5.4 |
+| 11 | Thái Ất Ngọc Tiên | 301 – 600 | 600 | 780 | 12 | 5.6 |
+| 12 | Đại La Kim Tiên | 601 – 1 000 | 1 000 | 910 | 13 | 5.8 |
+| 13 | Đạo Tổ | 1 001 – 1 500 | 1 500 | 1 050 | 14 | 6.0 |
+
+- **Điều kiện vào Tiên giới**: Đại Thừa tầng 10 **đầy thanh Linh khí** (694 960). Chỉ khi đó mới nhặt được Tiên khí; **viên Tiên khí đầu tiên (tien_khi = 1) → Chân Tiên ngay**.
+- Lên cảnh giới khi Tiên khí **vượt trần** cảnh giới hiện tại: 100 → 101 là Kim Tiên, 300 → 301 là Thái Ất, 600 → 601 là Đại La, **1 000 → 1 001 là Đạo Tổ**.
+- **Mốc khởi điểm** mỗi cảnh giới (đáy): Chân Tiên 1 · Kim Tiên 101 · Thái Ất 301 · Đại La 601 · Đạo Tổ 1 001.
+- Config: `tien_khi_ceilings: [100, 300, 600, 1000, 1500]`.
 
 **Ai nhặt được Tiên khí**
-**Linh khí và Tiên khí tách hẳn nhau** (ranh giới: Đại Thừa tầng 10):
-- Từ **Đại Thừa tầng 10** trở lên: chỉ hấp thụ **Tiên khí**. Viên Linh khí đi xuyên qua, không nhặt được.
-- Dưới mức đó: chỉ hấp thụ **Linh khí**. Viên Tiên khí đi xuyên qua, không nhặt được.
+**Linh khí và Tiên khí tách hẳn nhau** (ranh giới: Đại Thừa tầng 10 đầy thanh):
+- Từ **Đại Thừa tầng 10 đầy thanh** trở lên: chỉ hấp thụ **Tiên khí**. Viên Linh khí đi xuyên qua, không nhặt được.
+- Dưới mức đó (kể cả Đại Thừa tầng 10 chưa đầy): chỉ hấp thụ **Linh khí**. Viên Tiên khí đi xuyên qua, không nhặt được.
 - Viên không hấp thụ được vẫn nằm đó cho người dùng được tới nhặt; client vẽ mờ 30% với người không nhặt được để họ không chạy theo vô ích.
 - Không có quy đổi qua lại giữa hai loại.
 
 **Bị chém khi đang ở Tiên giới (cướp đoạt Tiên khí)**
-- Rớt 1 cảnh giới như thường (§5.1): Đạo Tổ → Đại La Kim Tiên ... Chân Tiên → Đại Thừa tầng 10.
-- Tiên khí **về mức khởi điểm của cảnh giới mới**: `loss = tien_khi − mốc_khởi_điểm_mới`. Ví dụ Kim Tiên đang 450 (đã 150/300 tới Thái Ất) bị chém → Chân Tiên, Tiên khí về 100, `loss = 350`.
-- Người chém (nếu đang ở Đại Thừa 10 trở lên) nhận **50% loss** Tiên khí; **30% loss** rơi thành viên Tiên khí quanh nạn nhân.
-- Người chém còn ở phàm giới (dưới Đại Thừa 10): **không nhận Tiên khí**, phần thưởng là Uy Danh (§11.1 — chém trúng Đạo Tổ = 1 400 × lật kèo). Tương tự, người Tiên giới chém người phàm không nhận Linh khí, chỉ nhận Uy Danh; phần Linh khí rơi ra vẫn rơi bình thường.
+- Rớt 1 cảnh giới như thường (§5.1): Đạo Tổ → Đại La Kim Tiên ... Kim Tiên → Chân Tiên.
+- Tiên khí **về mốc khởi điểm của cảnh giới mới**: `loss = tien_khi − đáy_mới`. Ví dụ Thái Ất đang 450 bị chém → Kim Tiên, Tiên khí về 101, `loss = 349`.
+- **Chân Tiên bị chém** → về **sàn Đại Thừa** (tầng 1, 0%, `total_exp = 346 800`; phải nạp lại 348 160 Linh khí mới đầy Đại Thừa 10), Tiên khí về 0. Phần Linh khí mất tính theo §5.1, phần Tiên khí mất = toàn bộ Tiên khí đang có.
+- Người chém (nếu đang hấp thụ được Tiên khí) nhận **50% loss** Tiên khí.
+- **Luôn rơi 30% loss thành viên Tiên khí** quanh nạn nhân — **bất kể người chém là ai** (phàm, Tiên, bot) và bất kể nạn nhân rớt về đâu (kể cả Chân Tiên rớt về Đại Thừa). Đây là nguồn Tiên khí quan trọng ngoài Đài Tiên Khí, phải luôn xảy ra.
+  - Chia thành viên: viên lớn 10 điểm trước, phần lẻ thành viên 2 điểm và 1 điểm; văng ra bán kính 200–500 quanh xác (như đài phun), tồn tại 60s như viên từ đài.
+  - Kèm hiệu ứng "nổ Tiên khí" vàng kim + SFX riêng để cả khu thấy có Tiên khí rơi.
+  - Viên rơi ra tuân luật hấp thụ thường: chỉ người đã vào Tiên giới (hoặc Đại Thừa 10 đầy thanh) nhặt được; người khác thấy mờ 30%.
+- Người chém chưa hấp thụ được Tiên khí: **không nhận Tiên khí**, phần thưởng là Uy Danh (§11.1 — chém trúng Đạo Tổ = 1 400 × lật kèo). Tương tự, người Tiên giới chém người phàm không nhận Linh khí, chỉ nhận Uy Danh; phần rơi ra vẫn rơi bình thường.
 - Kiếm thừa so với max mới rơi ra thành Bó Kiếm như thường.
 
-**Đạo Tổ: Tiên khí dư thành Uy Danh**
-- Thanh Tiên khí của Đạo Tổ **dừng ở mốc Đạo Tổ (1 500)**, không phình thêm (giữ luật cướp đoạt công bằng — Đạo Tổ ngồi lâu không thành "cục mồi" khổng lồ).
-- Tiên khí nhặt thêm khi đã là Đạo Tổ → Uy Danh theo tỉ lệ **10 Tiên khí = 1 Uy Danh** (`tien_overflow_score` = 0.1).
+**Đạo Tổ: nạp đầy rồi mới đổi Uy Danh**
+- Đạo Tổ vẫn nhặt Tiên khí bình thường để nạp thanh từ 1 001 lên **trần 1 500**.
+- **Chỉ khi thanh đang ở đúng 1 500** thì Tiên khí nhặt thêm mới đổi sang Uy Danh theo tỉ lệ **10 Tiên khí = 1 Uy Danh** (`tien_overflow_score` = 0.1). Thanh không vượt 1 500.
+- Đạo Tổ dùng Thiêu Đốt → Tiên khí bị trừ như thường (từ 1 500 trở xuống, không dưới 1 001). Muốn đổi Uy Danh tiếp thì phải **nạp lại đầy 1 500** trước.
 
 **Hiển thị & tấu hài**
-- HUD: **giữ nguyên thanh tiến độ**, chỉ đổi tên: dưới Tiên giới gọi là **Linh khí**, từ Đại Thừa tầng 10 trở lên gọi là **Tiên khí** (màu vàng kim). Ví dụ: `Kim Tiên — Tiên khí 150/300`.
+- HUD: **giữ nguyên thanh tiến độ**, chỉ đổi tên: dưới Tiên giới gọi là **Linh khí**, từ Chân Tiên trở lên gọi là **Tiên khí** (màu vàng kim), thanh chạy từ đáy tới trần cảnh giới. Ví dụ: `Kim Tiên — Tiên khí 150/300`. Đạo Tổ đầy 1 500: thanh nhấp nháy vàng + chữ "Tiên khí dư → Uy Danh".
 - Đột phá Tiên giới: hiệu ứng **Thiên Kiếp** (mây đen, sét đánh 3 lần liên tiếp, màn hình rung), kill feed toàn phòng: `"{A} vượt Thiên Kiếp, phi thăng {realm}!"`.
 - **Hào quang sau lưng** (mọi cảnh giới Tiên, mỗi cảnh giới một màu):
 
@@ -319,7 +336,7 @@ camera: chiều cao vùng nhìn thấy (đơn vị thế giới) = max(900 * sca
 ### 4.1c Thiêu Đốt Tinh Huyết (chạy nước rút)
 - Giữ **Shift**, hoặc **nháy đúp rồi giữ** chuột (PC); giữ nút **🔥**, hoặc **chạm 2 lần rồi giữ** (điện thoại): tốc chạy × 1.8.
 - Trong lúc giữ: mỗi giây đốt **8% EXP của tầng hiện tại** (`exp_needed(r, s) × 0.08`). Có thể rớt tầng nhưng **không bao giờ rớt cảnh giới**: tiến độ chạm đáy cảnh giới hiện tại (tầng 1, 0%) thì tự tắt.
-- **Ở Tiên giới** (từ Đại Thừa tầng 10 trở lên): đốt **Tiên khí** thay cho EXP — mỗi giây 8% Tiên khí cần cho bước hiện tại (Đạo Tổ: 8% × 500 = 40/giây), không bao giờ xuống dưới mốc khởi điểm của cảnh giới đang đứng. Đại Thừa tầng 10 chưa có Tiên khí → chưa đốt được cho tới khi nhặt Tiên khí đầu tiên.
+- **Ở Tiên giới** (Chân Tiên trở lên): đốt **Tiên khí** thay cho EXP — mỗi giây 8% độ rộng khoảng Tiên khí của cảnh giới đang đứng (Chân Tiên 8/giây, Kim Tiên 16, Thái Ất 24, Đại La 32, **Đạo Tổ 40**), không bao giờ xuống dưới đáy cảnh giới đang đứng. Đạo Tổ đầy 1 500 đốt được bình thường; sau đó phải nạp lại 1 500 mới đổi Uy Danh tiếp (§3.4).
 - Hiệu ứng: người bốc khói đỏ, mặt đỏ gay, vệt lửa sau chân, emote "Liều mạng!".
 
 ## 5. Chiến đấu
@@ -329,7 +346,9 @@ Thứ tự xử lý mỗi tick server:
 ### 5.1 Kiếm A chạm thân B — rớt 1 đại cảnh giới
 (A ≠ B, B không bất tử, không có khiên, không đang dịch chuyển)
 - Nếu B đang ở **Luyện Khí** (bất kỳ tầng nào) → B **chết** (mục 7). `loss = B.total_exp`; A nhận 50% loss + `kill_bonus_exp` (30), rơi 30% loss thành viên EXP, +1 kill.
-- Ngược lại B **rớt nguyên 1 cảnh giới, giữ nguyên tầng**: `L' = L - 10` (ví dụ Trúc Cơ tầng 2 → Luyện Khí tầng 2). Phần trăm tiến độ trong tầng được giữ: `total_exp' = cum(L') + progress% * exp_needed(L')`. `loss = total_exp - total_exp'`.
+- Ngược lại B **rớt 1 đại cảnh giới, thanh về mức sàn** của cảnh giới mới (tầng 1, 0%): `total_exp' = sàn(r − 1)` = tổng EXP cộng dồn của các cảnh giới trước đó. `loss = total_exp − total_exp'`.
+  - Ví dụ: Trúc Cơ tầng 2 (bất kể tiến độ) → **Luyện Khí tầng 1, 0%**. Kim Đan tầng 7 → **Trúc Cơ tầng 1, 0%** (`total_exp' = 1 360`).
+  - Sàn từng cảnh giới (cộng dồn, `realm_mult` 2.0): Luyện Khí 0 · Trúc Cơ 1 360 · Kim Đan 4 080 · Nguyên Anh 9 520 · Hóa Thần 20 400 · Luyện Hư 42 160 · Hợp Thể 85 680 · Độ Kiếp 172 720 · Đại Thừa 346 800.
 - A nhận `50% * loss` EXP; rơi `30% * loss` dạng viên EXP quanh B.
 - B bất tử **1s** (nhấp nháy), bị đẩy lùi khỏi A.
 - Mỗi tick, mỗi nạn nhân tối đa 1 hit.
@@ -461,7 +480,7 @@ Mỗi nhân vật có **1 kỹ năng riêng**, nhưng **không tự dùng đư�
 - Mỗi kỹ năng có câu thoại tấu hài khi dùng (bong bóng thoại) + SFX riêng.
 - Bot nhặt Bí Kíp như vật phẩm thường và dùng kỹ năng theo luật đơn giản (vd Cụ Rùa dùng Rụt Cổ khi còn 1 vòng và có địch gần; Bà Tám dùng Loa khi địch trong nón).
 - Server tính mọi hiệu ứng; client nhận event `SkillCast {id, skill, pos, dir}`, `SkillEffect`, `Blinded`.
-- Cân bằng ban đầu là đoán — dùng `cmd/sim --duel` cho bot đấu từng cặp (mỗi bên có 2 lượt kỹ năng), ghi tỉ lệ thắng mài kiếm; nhân vật nào > 60% thì giảm.
+- **Không cân bằng theo tỉ lệ thắng 1-đấu-1.** Kỹ năng có loại tăng sức mạnh, có loại để khắc chế/gây khó chịu, nên tỉ lệ thắng tay đôi không phản ánh giá trị thật. Cân bằng dựa trên **phản hồi người chơi** và số liệu trận thật (tỉ lệ nhặt Bí Kíp rồi dùng, hiệu quả trong giao tranh đông người).
 
 ## 7. Chết & màn hình chờ
 
@@ -1027,7 +1046,7 @@ Sau mỗi milestone: chạy `go run ./cmd/sim` để xem cân bằng (thời gia
   "cultivation": {
     "realms": ["Luyện Khí","Trúc Cơ","Kim Đan","Nguyên Anh","Hóa Thần","Luyện Hư","Hợp Thể","Độ Kiếp","Đại Thừa"],
     "tien_realms": ["Chân Tiên","Kim Tiên","Thái Ất Ngọc Tiên","Đại La Kim Tiên","Đạo Tổ"],
-    "tien_khi_per_step": [100, 200, 300, 400, 500],
+    "tien_khi_ceilings": [100, 300, 600, 1000, 1500], "tien_entry_requires_full_exp": true,
     "tien_rob_share": 0.5, "tien_drop_share": 0.3,
     "tien_scale_step": 0.2, "tien_overflow_score": 0.1,
     "tien_aura_colors": ["#E8F1FF", "#FFD60A", "#4CE0B3", "#B15CFF", "yin_yang"],
@@ -1132,7 +1151,6 @@ Sau mỗi milestone: chạy `go run ./cmd/sim` để xem cân bằng (thời gia
 - [ ] Không có Bí Kíp thì nút kỹ năng xám; nhặt Bí Kíp → +1 lượt (tối đa 2), dùng đúng kỹ năng của nhân vật mình; chết thì mất lượt; kỹ năng không làm chém thân người còn ≥ 2 vòng.
 - [ ] Trúng Phun Trân Châu: màn hình bị che ~60% trong 5s, không nhặt được gì trong 5s; HUD và minimap không bị che.
 - [ ] Shipper dùng Giao Hỏa Tốc đi xuyên vách đá được nhưng không ra khỏi biên khu; hết giờ trong vật cản thì được đẩy ra chỗ trống.
-- [ ] Đạo Tổ nạp 500 Tiên khí → Uy Danh +50 (10:1), thanh Tiên khí đứng ở 1 500.
 
 - [ ] Hai Kim Đan 60 kiếm mài nhau 1 giây → mỗi bên còn ~30 kiếm; đi xuyên qua nhau được; chỉ người còn 1 vòng mới bị chém thân.
 - [ ] Tốc Kiếm chỉ làm kiếm quay nhanh hơn, tầm chém không đổi.
@@ -1156,7 +1174,7 @@ Sau mỗi milestone: chạy `go run ./cmd/sim` để xem cân bằng (thời gia
 - [ ] Trúc Cơ va Luyện Khí: sau 12 lần va, Luyện Khí mất 12 kiếm, Trúc Cơ mất 10; **không ai đổi chiều**.
 - [ ] Nguyên Anh va Luyện Khí: Luyện Khí mất 1 mỗi lần va, Nguyên Anh mất 1 sau mỗi ≈1.73 lần (crack cộng 1/1.728).
 - [ ] Người 0 kiếm vẫn sống; bị chém thân thì rớt cảnh giới (Luyện Khí thì chết).
-- [ ] Bị chém ở Trúc Cơ tầng 2 → Luyện Khí tầng 2; kiếm vượt 10 rơi ra thành bó.
+- [ ] Bị chém ở Trúc Cơ tầng 2 → Luyện Khí tầng 1 thanh 0%; Kim Đan tầng 7 → Trúc Cơ tầng 1 thanh 0%; kiếm vượt trần rơi ra thành bó.
 - [ ] Bị chém ở Luyện Khí (tầng bất kỳ) → màn hình Tổng kết, bấm "Chơi tiếp" vào lại được; người chém nhận 50% EXP nạn nhân + 30; xác rơi 50% số kiếm.
 - [ ] Viên EXP từ quái chỉ người chém nhặt được trong 1.5s đầu.
 - [ ] Đi chéo 90° so với gió → tốc độ không đổi.
@@ -1169,10 +1187,12 @@ Sau mỗi milestone: chạy `go run ./cmd/sim` để xem cân bằng (thời gia
 - [ ] Ẩn Thân: người khác thấy mờ 20%, không tên; tối đa 5s; chém trúng người là hiện ngay.
 - [ ] Trúc Cơ chém trúng Nguyên Anh → +800 Uy Danh; chém lại cùng người trong 60s → +0.
 - [ ] Bảng Thần Tốc chỉ có những mạng đã đạt Đại Thừa.
-- [ ] Đại Thừa tầng 10 nhặt Linh khí không lên được; nhặt đủ 100 Tiên khí → Chân Tiên. Người dưới Đại Thừa 10 đi qua viên Tiên khí không nhặt được (viên mờ 30%); người Tiên giới đi qua viên Linh khí không nhặt được.
+- [ ] Đại Thừa tầng 10 chưa đầy thanh: nhặt Linh khí bình thường, không nhặt được Tiên khí. Đầy 694 960: nhặt 1 Tiên khí → Chân Tiên; 101 → Kim Tiên; 1 001 → Đạo Tổ. Người dưới Đại Thừa 10 đi qua viên Tiên khí không nhặt được (viên mờ 30%); người Tiên giới đi qua viên Linh khí không nhặt được.
 - [ ] Đột phá Kim Tiên: rồng vàng chui lên từ chân, quấn quanh người 1.5 vòng (nửa sau khuất sau nhân vật), bay vút lên, 2.5s; sau đó rồng nhỏ (60%) luôn lượn lờ quanh người, mỗi 8–15s làm 1 động tác ngẫu nhiên, khi chạy thì bị kéo dài phía sau.
 - [ ] Lên Chân Tiên thấy hào quang trắng bạc sau lưng; mỗi cảnh giới Tiên một màu; rớt về Đại Thừa thì tắt hào quang.
-- [ ] Kim Tiên đang 450 Tiên khí bị chém → Chân Tiên, Tiên khí 100; người chém (Tiên giới) +175, rơi 105 điểm viên Tiên khí.
+- [ ] Thái Ất đang 450 bị chém → Kim Tiên, Tiên khí 101; người chém (Tiên giới) +174, rơi 104 điểm viên Tiên khí. Chân Tiên bị chém → Đại Thừa tầng 1 thanh 0% (346 800), Tiên khí 0.
+- [ ] Chém người Tiên giới (người chém là phàm, Tiên hoặc bot đều được): luôn có viên Tiên khí vàng văng ra quanh xác, tổng = 30% Tiên khí nạn nhân mất (Chân Tiên 80 Tiên khí bị chém → rơi 24).
+- [ ] Đạo Tổ: nhặt Tiên khí khi chưa đủ 1 500 → nạp thanh, không cộng Uy Danh; đủ 1 500 → +1 Uy Danh mỗi 10 Tiên khí; Thiêu Đốt kéo thanh xuống, phải nạp lại 1 500 mới đổi tiếp.
 - [ ] Không còn vùng nền/bùn/bụi/đường nào là hình chữ nhật thẳng cạnh hay hình tròn hoàn hảo; ranh giới biome loang tự nhiên; đứng sát mép bùn thì hiệu ứng chậm khớp đúng mép đa giác.
 - [ ] HUD góc trên trái là chân dung nhân vật, viền màu cảnh giới, biểu cảm đổi theo trạng thái.
 - [ ] Bảng tên đọc rõ trên nền vòng kiếm nhiều màu; tên mình màu vàng có ▼; người cao cảnh giới hơn mình có ▲ đỏ; Top 1 có ruy băng đỏ-vàng + vương miện + vệt sáng lướt.

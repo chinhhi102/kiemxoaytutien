@@ -146,3 +146,55 @@ Mỗi buổi xong: test + build pass, cập nhật PROGRESS.md, báo số FPS/KB
 
 ### Q22 — `tien_overflow_score`
 **0.1 là đúng** (10 Tiên khí = 1 Uy Danh). Giữ như em đang để. Spec v5.3 §3.4 và config đã sửa thành 0.1; checklist: nạp 500 Tiên khí → +50 Uy Danh.
+
+---
+
+## Trả lời Q20–Q25 (bản gộp — thay thế mọi bản cũ)
+
+> Lưu ý cho em: `docs/_raw/GAME_SPEC.md` và `docs/_raw/ANSWERS.md` anh vừa thay bằng bản mới nhất (spec v5.6). Nhiều câu hỏi gần đây (Q20, Q22, mục 25–33, và Q24 nhắc "sát mạng") là do `_raw` cũ. Từ v4.0, Tiên giới lên bằng **Tiên khí** từ Đài Tiên Khí, không còn sát mạng.
+
+**Tối ưu (CHANGES_v4 25–27): ĐI TIẾP.** Thứ tự: mạng (27) → server (26, pprof) → client phần rẻ (25.1 vòng kiếm thành texture, BitmapText, cull). Đo lại loadtest + 10 tab Chrome headless (thường + 4G yếu), ghi trước/sau.
+
+**Thư viện: DUYỆT** `pixi-filters`, `revolt-fx`. Thêm vào CLAUDE.md: *"Thư viện spec ghi đích danh coi như đã duyệt; thư viện khác vẫn hỏi."*
+
+**Q20: phương án 1** — giữ luật va kiếm đúng. Ghi 84 lượt chết/5 phút/40 bot làm mốc mới, đánh dấu số cũ "đo trên luật sai". Chơi thử sau 5 khu + Bí Kíp rồi mới quyết có chỉnh không (nếu chỉnh thì ưu tiên tăng `sword.width`).
+
+**Q22: 0.1** (10 Tiên khí = 1 Uy Danh). Spec đã sửa khớp.
+
+**Q23:** đã sửa trong spec v5.6 — §4.1c thêm "nháy đúp rồi giữ / chạm 2 lần rồi giữ", §18.1 thêm dòng Kỹ năng.
+
+**Q24: phương án 2** — spec §4.1c (đã có từ v4.0, nay ghi rõ hơn): ở Tiên giới đốt **Tiên khí**, mỗi giây 8% Tiên khí của bước hiện tại, không xuống dưới mốc khởi điểm cảnh giới đang đứng. Config `player.burn_tien_frac_per_sec: 0.08`. Sửa `burn_tien_test.go` theo luật này.
+
+**Q25: chưa chỉnh cân bằng** — đúng ý anh, để người chơi phản hồi. Giữ bản `--duel` mới (đủ trần cảnh giới) làm chuẩn đo. Ghi bảng vào PROGRESS.md để so sau mỗi lần chỉnh.
+
+---
+
+## Q25 (lần 2) — Bỏ cách đo tỉ lệ thắng 1-đấu-1
+Kỹ năng có loại tăng sức mạnh, có loại khắc chế/gây khó chịu → tỉ lệ thắng tay đôi không phản ánh giá trị. **Bỏ** việc cân bằng theo bảng này: xóa `cmd/sim --duel` (hoặc giữ làm công cụ debug nhưng không báo cáo, không dùng để chỉnh số). Spec §6.3 đã sửa: cân bằng theo phản hồi người chơi + số liệu trận thật.
+
+## Q26 — Đạo Tổ & Tiên khí: luật mới (spec v5.7 §3.4, §4.1c)
+Thay toàn bộ cách tính Tiên giới:
+1. **Vào Tiên giới**: chỉ khi Đại Thừa tầng 10 **đầy thanh** (`total_exp = 694 960`). Chưa đầy → vẫn nhặt Linh khí, không nhặt được Tiên khí (`BanksTienKhi` đổi điều kiện từ "Đại Thừa 10" sang "exp đầy trần").
+2. **Cảnh giới Tiên = theo tổng Tiên khí cộng dồn**, trần `tien_khi_ceilings: [100, 300, 600, 1000, 1500]`: 1–100 Chân Tiên · 101–300 Kim Tiên · 301–600 Thái Ất · 601–1000 Đại La · 1001–1500 Đạo Tổ. **Viên Tiên khí đầu tiên → Chân Tiên ngay.** Bỏ `tien_khi_per_step`.
+3. **Đạo Tổ**: nạp thanh từ 1 001 tới 1 500; **chỉ khi đang đúng 1 500** thì Tiên khí nhặt thêm mới đổi Uy Danh (10:1). Thiêu Đốt trừ Tiên khí bình thường (không dưới 1 001) — phải nạp lại 1 500 mới đổi tiếp. → Đạo Tổ Thiêu Đốt được (thay phương án tạm 1 của em).
+4. Thiêu Đốt Tiên giới: 8% độ rộng khoảng của cảnh giới/giây (Chân Tiên 8, Kim Tiên 16, Thái Ất 24, Đại La 32, Đạo Tổ 40), không dưới đáy.
+5. Bị chém: Tiên khí về **đáy cảnh giới mới** (1 / 101 / 301 / 601 / 1 001). Chân Tiên bị chém → Đại Thừa 10 thanh 0% (`total_exp = 650 928`), Tiên khí 0.
+6. Sửa `TestDaoToHasNoTienKhiHeadroom` thành test luật mới; thêm test theo checklist §17.
+
+---
+
+## v5.8 — Bị chém: rớt 1 đại cảnh giới, thanh về mức sàn
+Thay luật "rớt 1 cảnh giới, giữ nguyên tầng + % tiến độ" (§5.1 cũ):
+- Bị chém (khi không chết) → `total_exp = sàn(cảnh giới mới)` = tầng 1, thanh 0%. Ví dụ Trúc Cơ tầng 2 → Luyện Khí tầng 1 0%; Kim Đan tầng 7 → Trúc Cơ tầng 1 0% (1 360).
+- `loss = total_exp cũ − sàn mới` (người chém nhận 50%, rơi 30% như cũ).
+- Tiên giới: Tiên khí về đáy cảnh giới mới (như v5.7). **Chân Tiên bị chém → sàn Đại Thừa** (tầng 1, 0%, `total_exp = 346 800`), Tiên khí 0 — thay cho "Đại Thừa 10 thanh 0%" ở v5.7.
+- Sửa test & checklist §17 theo luật mới.
+
+---
+
+## v5.9 — LỖI: chém người Tiên giới không rơi Tiên khí
+Anh thấy chém người cấp Tiên không có Tiên khí rơi ra. Spec §3.4 luôn yêu cầu rơi 30% — đây là lỗi, sửa:
+1. Tái hiện trước: dùng `?debug=true` nạp cho bot 1 lên Kim Tiên (vd 250 Tiên khí), cho người chơi chém trúng — ghi lại có event rơi viên không, viên có được gửi xuống client không, client có vẽ không (viên Tiên khí có thể đang bị lọc bởi AOI/LOD "không gửi viên nhỏ khi camera lùi xa", hoặc bị vẽ mờ 30% rồi chìm vào nền). Báo tôi nguyên nhân.
+2. Luật đúng (spec v5.9 §3.4): **luôn** rơi `floor(30% × loss_tiên_khí)` thành viên Tiên khí quanh nạn nhân, **bất kể người chém là phàm/Tiên/bot**, kể cả Chân Tiên rớt về Đại Thừa (loss = toàn bộ Tiên khí). Chia viên 10 → 2 → 1, văng bán kính 200–500, tồn tại 60s, có hiệu ứng nổ vàng + SFX.
+3. Viên Tiên khí **không bị loại bởi LOD/AOI "viên nhỏ"** (mục 27) — Tiên khí luôn được gửi khi trong khung nhìn.
+4. Test: Chân Tiên 80 bị chém → rơi tổng 24; Thái Ất 450 → Kim Tiên, rơi 104; người chém phàm vẫn làm rơi đủ.

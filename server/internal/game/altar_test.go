@@ -111,11 +111,13 @@ func TestTienKhiOrbExpires(t *testing.T) {
 	}
 }
 
-// Hai đường tu tách hẳn (§3.4, anh chốt 2026-10-28): Đại Thừa 10 trở lên chỉ hấp thụ Tiên
-// khí, dưới đó chỉ hấp thụ Linh khí — không đổi qua lại nữa.
+// Hai đường tu tách hẳn (§3.4): **Đại Thừa 10 ĐẦY THANH** trở lên chỉ hấp thụ Tiên khí,
+// dưới đó chỉ hấp thụ Linh khí — không đổi qua lại nữa (mốc đổi từ v5.7: phải đầy thanh,
+// không phải chỉ cần đứng ở tầng 10).
 func TestTienKhiAndLinhKhiDoNotMix(t *testing.T) {
 	g := altarGame(t)
 	top := g.AddPlayer(SpawnOptions{Name: "Top", Level: g.Prog.TopMortalLevel(), Swords: 1})
+	top.TotalExp = g.Prog.MaxExp()
 	if got := g.GainTienKhi(top, 50); got != 50 || top.TienKhi != 50 {
 		t.Fatalf("Đại Thừa 10 phải tích thẳng: nhận %v, thanh %v", got, top.TienKhi)
 	}
@@ -151,6 +153,7 @@ func TestOrbsOnlyGoToTheRightCultivator(t *testing.T) {
 	}
 
 	top := g.AddPlayer(SpawnOptions{Name: "Top", Level: g.Prog.TopMortalLevel(), Swords: 1})
+	top.TotalExp = g.Prog.MaxExp()
 	place(g, top, Vec{X: 7000, Y: 7000}, 0)
 	orb := g.addItem("orb", 20, top.Pos)
 	g.Tick(dt)
@@ -167,52 +170,30 @@ func TestOrbsOnlyGoToTheRightCultivator(t *testing.T) {
 	}
 }
 
-// Spec §3.4: đủ mốc thì phi thăng; mốc cộng dồn là 100, 300, 600, 1000, 1500.
+// Spec v5.7 §3.4: cảnh giới Tiên suy ra từ tổng Tiên khí; trần là 100, 300, 600, 1000, 1500
+// và **viên đầu tiên là vào Chân Tiên ngay**.
 func TestTienKhiPromotesAtThresholds(t *testing.T) {
 	g := altarGame(t)
 	p := g.AddPlayer(SpawnOptions{Name: "P", Level: g.Prog.TopMortalLevel(), Swords: 1})
+	p.TotalExp = g.Prog.MaxExp() // đầy thanh Đại Thừa 10 mới nhặt được Tiên khí
 	for i, want := range []float64{100, 300, 600, 1000, 1500} {
-		if got := g.Prog.TienEntry(i); got != want {
-			t.Fatalf("mốc Tiên giới %d = %v, muốn %v", i, got, want)
+		if got := g.Prog.TienCeil(i); got != want {
+			t.Fatalf("trần Tiên giới %d = %v, muốn %v", i, got, want)
 		}
 	}
-	g.GainTienKhi(p, 99)
 	if g.TienRealmOf(p) != -1 {
-		t.Fatal("99 Tiên khí đã lên Chân Tiên, phải cần 100")
+		t.Fatal("chưa có Tiên khí nào mà đã vào Tiên giới")
 	}
 	g.GainTienKhi(p, 1)
 	if g.TienRealmOf(p) != 0 {
-		t.Fatalf("đủ 100 phải lên Chân Tiên, đang %d", g.TienRealmOf(p))
+		t.Fatalf("viên Tiên khí đầu tiên phải vào Chân Tiên ngay, đang %d", g.TienRealmOf(p))
 	}
-	g.GainTienKhi(p, 1400) // tổng 1500 → thẳng lên Đạo Tổ
+	g.GainTienKhi(p, 1000) // tổng 1001 → Đạo Tổ
 	if got := g.TienRealmOf(p); got != 4 {
-		t.Fatalf("1500 Tiên khí phải tới Đạo Tổ (4), đang %d", got)
+		t.Fatalf("1001 Tiên khí phải tới Đạo Tổ (4), đang %d", got)
 	}
 }
 
-// Spec §3.4 ví dụ: Kim Tiên đang 450 bị chém → Chân Tiên, Tiên khí về 100, loss = 350;
-// người chém nhận 50%, 30% rơi thành viên.
-func TestRobTienKhiOnHit(t *testing.T) {
-	g := altarGame(t)
-	victim := g.AddPlayer(SpawnOptions{Name: "V", Swords: 1})
-	victim.Level = g.Prog.TienLevel(1) // Kim Tiên
-	victim.TienKhi = 450
-	g.refreshDerived(victim)
-	robber := g.AddPlayer(SpawnOptions{Name: "R", Level: g.Prog.TopMortalLevel(), Swords: 1})
-	g.robTienKhi(robber, victim)
-
-	if got := g.TienRealmOf(victim); got != 0 {
-		t.Fatalf("nạn nhân về Tiên giới %d, muốn Chân Tiên (0)", got)
-	}
-	if victim.TienKhi != 100 {
-		t.Fatalf("Tiên khí nạn nhân = %v, muốn về mốc 100", victim.TienKhi)
-	}
-	loss := 350.0
-	if want := loss * g.Cfg.Cultivation.TienRobShare; robber.TienKhi != want {
-		t.Fatalf("người chém nhận %v, muốn %v", robber.TienKhi, want)
-	}
-	_, dropped := countKind(g, ItemTienKhi)
-	if want := loss * g.Cfg.Cultivation.TienDropShare; math.Abs(dropped-want) > 0.5 {
-		t.Fatalf("rơi %v điểm, muốn %v", dropped, want)
-	}
-}
+// Luật cướp đoạt Tiên khí khi bị chém nằm ở `burn_tien_test.go`
+// (TestCutTienGioiThaiAt450, TestCutChanTienFallsToDaiThuaFloor) — con số lấy thẳng từ
+// checklist §17 của spec v5.8.

@@ -26,17 +26,17 @@ type prop struct {
 }
 
 type object struct {
-	ID         int     `json:"id"`
-	Name       string  `json:"name"`
-	Type       string  `json:"type"`
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	Width      float64 `json:"width"`
-	Height     float64 `json:"height"`
-	Rotation   float64 `json:"rotation"`
-	Visible    bool    `json:"visible"`
-	Ellipse    bool    `json:"ellipse,omitempty"`
-	Point      bool    `json:"point,omitempty"`
+	ID       int     `json:"id"`
+	Name     string  `json:"name"`
+	Type     string  `json:"type"`
+	X        float64 `json:"x"`
+	Y        float64 `json:"y"`
+	Width    float64 `json:"width"`
+	Height   float64 `json:"height"`
+	Rotation float64 `json:"rotation"`
+	Visible  bool    `json:"visible"`
+	Ellipse  bool    `json:"ellipse,omitempty"`
+	Point    bool    `json:"point,omitempty"`
 	// Polygon: đỉnh TƯƠNG ĐỐI so với (X, Y) theo đúng định dạng Tiled (spec §8.6).
 	Polygon    []point `json:"polygon,omitempty"`
 	Properties []prop  `json:"properties,omitempty"`
@@ -187,10 +187,10 @@ func (b *builder) wall(x, y, w, h float64) bool {
 func (b *builder) border() {
 	lo, hi := mapMargin, b.size-mapMargin
 	span := hi - lo
-	b.wall(lo, lo, span, borderThick)                            // trên
-	b.wall(lo, hi-borderThick, span, borderThick)                // dưới
-	b.wall(lo, lo, borderThick, span)                            // trái
-	b.wall(hi-borderThick, lo, borderThick, span)                // phải
+	b.wall(lo, lo, span, borderThick)             // trên
+	b.wall(lo, hi-borderThick, span, borderThick) // dưới
+	b.wall(lo, lo, borderThick, span)             // trái
+	b.wall(hi-borderThick, lo, borderThick, span) // phải
 }
 
 func (b *builder) zone(kind string, x, y, w, h float64, ellipse bool, props ...prop) bool {
@@ -308,7 +308,7 @@ func (b *builder) validate() error {
 				r = rect{o.X, o.Y, o.X, o.Y}
 			}
 			if !b.inBounds(r) {
-						bad = append(bad, fmt.Sprintf("%s/%s tại (%.0f,%.0f)-(%.0f,%.0f)", ln, o.Type, r.x0, r.y0, r.x1, r.y1))
+				bad = append(bad, fmt.Sprintf("%s/%s tại (%.0f,%.0f)-(%.0f,%.0f)", ln, o.Type, r.x0, r.y0, r.x1, r.y1))
 			}
 		}
 	}
@@ -461,7 +461,7 @@ func buildWithRetries(size float64, seed int64, mg config.Mapgen) (*builder, int
 // langTre: balanced village — fences, houses, ponds of mud, bushes, two gate pairs.
 func langTre(b *builder) {
 	s := b.size
-	b.border() // tường biên không phá được (§8.1)
+	b.border()         // tường biên không phá được (§8.1)
 	b.placeAltars(300) // 5 Đài Tiên Khí (§8.5), đặt trước vật cản để giữ trống quanh đài
 	b.gate(1500, 1500, "a", "purple")
 	b.gate(s-1500, s-1500, "a", "purple")
@@ -500,7 +500,7 @@ func langTre(b *builder) {
 // choDem: night market — rows of stalls and carts, many alleys of all widths.
 func choDem(b *builder) {
 	s := b.size
-	b.border() // tường biên không phá được (§8.1)
+	b.border()         // tường biên không phá được (§8.1)
 	b.placeAltars(300) // 5 Đài Tiên Khí (§8.5), đặt trước vật cản để giữ trống quanh đài
 	b.gate(1200, s/2, "a", "orange")
 	b.gate(s-1200, s/2, "a", "orange")
@@ -544,7 +544,7 @@ func choDem(b *builder) {
 // nuiDa: wide rocky land with huge boulders, ridges and a 4-gate network.
 func nuiDa(b *builder) {
 	s := b.size
-	b.border() // tường biên không phá được (§8.1)
+	b.border()         // tường biên không phá được (§8.1)
 	b.placeAltars(300) // 5 Đài Tiên Khí (§8.5), đặt trước vật cản để giữ trống quanh đài
 	net := [][2]float64{{1800, 1800}, {s - 1800, 1800}, {s - 1800, s - 1800}, {1800, s - 1800}}
 	for _, p := range net {

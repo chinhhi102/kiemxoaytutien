@@ -56,11 +56,11 @@ type seg struct {
 // Vec2 is a plain point (cmd/mapgen does not import the game packages).
 type Vec2 struct{ X, Y float64 }
 
-func (p Vec2) add(q Vec2) Vec2      { return Vec2{p.X + q.X, p.Y + q.Y} }
-func (p Vec2) sub(q Vec2) Vec2      { return Vec2{p.X - q.X, p.Y - q.Y} }
-func (p Vec2) mul(k float64) Vec2   { return Vec2{p.X * k, p.Y * k} }
-func (p Vec2) len() float64         { return math.Hypot(p.X, p.Y) }
-func (p Vec2) dist(q Vec2) float64  { return p.sub(q).len() }
+func (p Vec2) add(q Vec2) Vec2     { return Vec2{p.X + q.X, p.Y + q.Y} }
+func (p Vec2) sub(q Vec2) Vec2     { return Vec2{p.X - q.X, p.Y - q.Y} }
+func (p Vec2) mul(k float64) Vec2  { return Vec2{p.X * k, p.Y * k} }
+func (p Vec2) len() float64        { return math.Hypot(p.X, p.Y) }
+func (p Vec2) dist(q Vec2) float64 { return p.sub(q).len() }
 
 // rot90 rotates a point around the map centre, q times (step 3: đối xứng xoay 4 phía).
 func (g *gen) rot90(p Vec2, q int) Vec2 {
@@ -290,11 +290,11 @@ func (g *gen) house(bm biome, at Vec2) {
 	w, h := g.b.rnd(500, 900), g.b.rnd(400, 700)
 	t := 110.0
 	door := 260.0
-	g.b.obstacle("brick", at.X, at.Y, w, t, 40)                       // tường trên
-	g.b.obstacle("brick", at.X, at.Y+h-t, (w-door)/2, t, 40)          // tường dưới trái
+	g.b.obstacle("brick", at.X, at.Y, w, t, 40)                         // tường trên
+	g.b.obstacle("brick", at.X, at.Y+h-t, (w-door)/2, t, 40)            // tường dưới trái
 	g.b.obstacle("brick", at.X+(w+door)/2, at.Y+h-t, (w-door)/2, t, 40) // tường dưới phải
-	g.b.obstacle("brick", at.X, at.Y, t, h, 40)                       // tường trái
-	g.b.obstacle("brick", at.X+w-t, at.Y, t, h, 40)                   // tường phải
+	g.b.obstacle("brick", at.X, at.Y, t, h, 40)                         // tường trái
+	g.b.obstacle("brick", at.X+w-t, at.Y, t, h, 40)                     // tường phải
 }
 
 // alleyFor guarantees each biome has its signature narrow alley (step 8 kiểm tra).

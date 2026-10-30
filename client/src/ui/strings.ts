@@ -82,6 +82,8 @@ export const STR = {
   linhKhi: 'Linh khí',
   tienKhi: (have: number, need: number) => `Tiên khí ${Math.floor(have)}/${Math.round(need)}`,
   tienMax: 'Đỉnh cao Tiên giới',
+  /** Đạo Tổ đã nạp đầy 1 500: từ đây Tiên khí nhặt thêm mới đổi Uy Danh (spec v5.7 §3.4). */
+  tienOverflow: 'Tiên khí dư → Uy Danh',
   swords: (n: number, max: number) => `Kiếm ${n}/${max}`,
   roomTop: 'Top phòng',
   yourRank: (rank: number, total: number) => `Hạng của bạn: ${rank}/${total}`,

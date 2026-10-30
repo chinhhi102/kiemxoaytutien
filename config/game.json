@@ -18,14 +18,17 @@
       "Đại La Kim Tiên",
       "Đạo Tổ"
     ],
-    "tien_khi_per_step": [
+    "tien_khi_ceilings": [
       100,
-      200,
       300,
-      400,
-      500
+      600,
+      1000,
+      1500
     ],
+    "tien_entry_requires_full_exp": true,
     "tien_rob_share": 0.5,
+    "tien_drop_scatter_min": 200.0,
+    "tien_drop_scatter_max": 500.0,
     "tien_drop_share": 0.3,
     "tien_scale_step": 0.2,
     "tien_aura_colors": [

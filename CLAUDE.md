@@ -14,7 +14,9 @@ Người sở hữu dự án KHÔNG rành setup kỹ thuật → giải thích n
 - Server: Go, `github.com/coder/websocket`, `github.com/vmihailenco/msgpack/v5`, `modernc.org/sqlite`. Thư mục `server/`.
 - Client: TypeScript + Vite + PixiJS + `@msgpack/msgpack` + `howler`. Thư mục `client/`.
 - Bản đồ: Tiled `.tmj` trong `maps/`.
-- Không thêm thư viện/framework khác khi chưa hỏi.
+- Không thêm thư viện/framework khác khi chưa hỏi. **Ngoại lệ (chủ dự án chốt 30/10/2026):
+  thư viện nào spec ghi đích danh thì coi như đã duyệt, cứ thêm; thư viện khác vẫn phải hỏi.**
+  Đã duyệt sẵn theo luật này: `pixi-filters`, `revolt-fx`.
 
 ## Lệnh
 - Chạy server: `cd server && go run ./cmd/server` (mặc định cổng 9999, mở ra mạng LAN)

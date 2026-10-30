@@ -32,14 +32,14 @@ type oneCase struct {
 	// địa hình (bùn ×0.6, đường gió ×1.5/×0.8), mà vùng bây giờ là ĐA GIÁC. Bản kiểm cũ chỉ
 	// so va chạm nên không thấy client thiếu hẳn phép xét đa giác — đi giữa đồng trống vẫn
 	// ra 20 lần hiệu chỉnh mỗi giây.
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-	VX    float64 `json:"vx"`
-	VY    float64 `json:"vy"`
-	Angle float64 `json:"a"`
-	Scale float64 `json:"sc"`
-	DT    float64 `json:"dt"`
-	Moving bool   `json:"mv"`
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	VX     float64 `json:"vx"`
+	VY     float64 `json:"vy"`
+	Angle  float64 `json:"a"`
+	Scale  float64 `json:"sc"`
+	DT     float64 `json:"dt"`
+	Moving bool    `json:"mv"`
 	// Ghost: đang Giao Hỏa Tốc — xuyên mọi vật cản và chạy ×3 (spec v5.5 §6.3). Phải có
 	// trong bài đối chiếu vì nó đổi CẢ hai thứ quyết định vị trí: tốc độ và va chạm.
 	Ghost bool    `json:"gh"`
@@ -80,7 +80,6 @@ func main() {
 	rng := rand.New(rand.NewSource(*seed))
 	f := fixture{Map: m, Cases: make([]oneCase, 0, *n)}
 	dt := 1 / float64(max(cfg.Net.TickHz, 1))
-
 
 	// Vùng làm ĐỔI TỐC ĐỘ (bùn, nước, gió) phải được thử riêng. Lần đầu viết bài này tôi
 	// rải điểm quanh vật cản và rìa bản đồ, kết quả 0/1 000 ca rơi vào bùn hay nước — bài

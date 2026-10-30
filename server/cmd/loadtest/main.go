@@ -39,7 +39,7 @@ type client struct {
 func (c *client) Send(b []byte) bool {
 	c.bytes += int64(len(b))
 	var head struct {
-		T string `msgpack:"t"`
+		T string  `msgpack:"t"`
 		C float64 `msgpack:"c"`
 	}
 	if err := netproto.Decode(b, &head); err == nil {

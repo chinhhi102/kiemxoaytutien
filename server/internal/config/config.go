@@ -24,13 +24,24 @@ type Cultivation struct {
 	// Tiên giới (spec §3.4): 5 cảnh giới sau Đại Thừa, không chia tầng, chỉ lên được
 	// bằng sát mạng chứ không dùng EXP.
 	TienRealms []string `json:"tien_realms"`
-	// TienKhiPerStep: Tiên khí cần cho từng chặng. Không còn quy đổi sang Linh khí —
-	// hai đường tu tách hẳn từ spec v4.5 §3.4.
-	TienKhiPerStep []float64 `json:"tien_khi_per_step"`
-	TienRobShare   float64   `json:"tien_rob_share"`
-	TienDropShare  float64   `json:"tien_drop_share"`
-	TienScaleStep  float64   `json:"tien_scale_step"`
-	TienAuraColors []string  `json:"tien_aura_colors"`
+	// TienKhiCeilings: TRẦN Tiên khí cộng dồn của từng cảnh giới Tiên (spec v5.7 §3.4).
+	// [100,300,600,1000,1500] nghĩa là 1–100 Chân Tiên, 101–300 Kim Tiên, … 1001–1500 Đạo Tổ.
+	//
+	// Cảnh giới Tiên suy ra THẲNG từ tổng Tiên khí đang có, không cộng dồn từng chặng như
+	// bản v5.6 (`tien_khi_per_step`). Khác biệt thật: bị chém thì Tiên khí về đáy cảnh giới
+	// mới, và cảnh giới tự tụt theo — không còn hai nguồn sự thật để lệch nhau.
+	TienKhiCeilings []float64 `json:"tien_khi_ceilings"`
+	// TienEntryRequiresFullExp: phải ĐẦY thanh Đại Thừa tầng 10 mới nhặt được Tiên khí.
+	TienEntryRequiresFullExp bool    `json:"tien_entry_requires_full_exp"`
+	TienRobShare             float64 `json:"tien_rob_share"`
+	TienDropShare            float64 `json:"tien_drop_share"`
+	// TienDropScatterMin/Max: viên Tiên khí rơi ra khi bị chém văng xa ngần này (spec v5.9).
+	// Phải xa hơn hẳn thân người Tiên giới: họ to gấp 5–6 lần, và vật phẩm vẽ DƯỚI nhân vật,
+	// nên viên rơi gần là nằm khuất hẳn dưới xác — đó chính là lỗi "chém mà không thấy rơi".
+	TienDropScatterMin float64  `json:"tien_drop_scatter_min"`
+	TienDropScatterMax float64  `json:"tien_drop_scatter_max"`
+	TienScaleStep      float64  `json:"tien_scale_step"`
+	TienAuraColors     []string `json:"tien_aura_colors"`
 }
 
 type Sword struct {

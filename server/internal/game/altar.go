@@ -108,13 +108,26 @@ func (g *Game) sprayTienKhi(a world.Altar, n int, value float64) {
 
 // scatterTienKhi drops robbed Tiên khí around a victim (spec §3.4). It splits the total into
 // orbs no bigger than the medium orb so a single pickup cannot take it all back.
+// Chia viên **10 → 2 → 1** và văng ra bán kính 200–500 (spec v5.9 §3.4).
+//
+// Bán kính là chỗ đã hỏng và khó thấy: bản cũ dùng `items.scatter_r` = 90, trong khi người
+// Tiên giới có scale 5–6 nên thân rộng hơn 150 và cao hơn 400 pixel — mà vật phẩm vẽ DƯỚI
+// nhân vật (`zIndex = y − 1000`). Kết quả: viên rơi đúng, gửi đúng, nhưng nằm khuất hẳn
+// dưới cái xác to đùng, nên chủ dự án chém xong "không thấy Tiên khí rơi ra".
+//
+// Test khoá lại phần SỐ LIỆU (tổng điểm rơi); phần nhìn thấy được thì bán kính lo.
 func (g *Game) scatterTienKhi(at Vec, total float64) {
-	unit := math.Max(1, g.Cfg.Altars.Small.MediumValue)
-	for left := total; left > 0.5; left -= unit {
-		v := math.Min(unit, left)
-		ang := g.Rng.Float64() * 2 * math.Pi
-		d := g.Rng.Float64() * g.Cfg.Items.ScatterR
-		g.addTienKhiOrb(at.Add(geom.FromAngle(ang).Mul(d)), v)
+	c := g.Cfg.Cultivation
+	lo := math.Max(1, c.TienDropScatterMin)
+	hi := math.Max(lo, c.TienDropScatterMax)
+	left := math.Floor(total)
+	for _, unit := range []float64{10, 2, 1} {
+		for left >= unit {
+			ang := g.Rng.Float64() * 2 * math.Pi
+			d := lo + g.Rng.Float64()*(hi-lo)
+			g.addTienKhiOrb(at.Add(geom.FromAngle(ang).Mul(d)), unit)
+			left -= unit
+		}
 	}
 }
 

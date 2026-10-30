@@ -209,6 +209,40 @@ Hiệu năng: 40 bot, bản đồ thật → ~0.16 ms/tick (mục tiêu < 3 ms).
 
 ## Lỗi / hạn chế đã biết
 
+- **Spec v5.7 — Tiên giới tính theo TỔNG Tiên khí (30/10/2026, §3.4)**. Trước đây cảnh giới
+  Tiên nằm trong `Level` còn Tiên khí cộng dồn từng chặng — **hai nguồn sự thật**, và chúng
+  lệch nhau đúng lúc bị chém. Giờ Tiên khí là nguồn duy nhất, cảnh giới suy ra từ nó:
+  1–100 Chân Tiên · 101–300 Kim Tiên · 301–600 Thái Ất · 601–1000 Đại La · 1001–1500 Đạo Tổ
+  (`tien_khi_ceilings`). Viên Tiên khí **đầu tiên** là vào Chân Tiên ngay.
+  - **Vào Tiên giới cần Đại Thừa tầng 10 ĐẦY THANH** (694 960), không phải chỉ cần đứng ở
+    tầng 10. Trước đây vừa chạm tầng 10 là Linh khí nhặt được cũng bị bỏ phí trong khi Tiên
+    khí rất hiếm, nên người chơi kẹt cứng ở đó.
+  - **Đạo Tổ nạp thanh 1 001 → 1 500**, chỉ khi đang đúng 1 500 thì Tiên khí dư mới đổi Uy
+    Danh (10:1). Nhờ vậy Đạo Tổ **Thiêu Đốt được** — đó là câu trả lời cho Q26.
+  - Thiêu Đốt ở Tiên giới = **8% độ rộng khoảng** của cảnh giới đang đứng: 8 · 16 · 24 · 32 ·
+    40 mỗi giây. Theo độ rộng khoảng chứ không một con số chung, nên người ở đỉnh không được
+    chạy rẻ hơn người mới vào.
+- **Spec v5.8 — bị chém: thanh về MỨC SÀN cảnh giới mới (30/10/2026, §5.1)**. Trước giữ
+  nguyên tầng và % tiến độ (Trúc Cơ tầng 2 → Luyện Khí tầng 2); giờ Trúc Cơ tầng 2 → **Luyện
+  Khí tầng 1, 0%**, Kim Đan tầng 7 → Trúc Cơ tầng 1 0% (1 360). Chân Tiên bị chém → **sàn
+  Đại Thừa** (346 800), Tiên khí 0. `TestRealmFloors` khoá cả 9 con số sàn vì `realm_mult`
+  đổi một chữ số là cả bảng lệch mà không có gì báo.
+- **Spec v5.9 — chém người Tiên giới không thấy Tiên khí rơi: ĐÃ TÌM RA NGUYÊN NHÂN
+  (30/10/2026)**. Server **vẫn rơi đúng** — test tái hiện cho ra 3 viên tổng 24 điểm, khớp
+  chính xác con số spec (30% × 80). Lỗi nằm ở chỗ **nhìn thấy**: viên văng trong bán kính
+  `items.scatter_r` = 90, trong khi người Tiên giới có scale 5–6 nên thân rộng hơn 150 và
+  cao hơn 400 pixel, **mà vật phẩm vẽ DƯỚI nhân vật** (`zIndex = y − 1000`). Viên rơi đúng,
+  gửi đúng, nhưng nằm khuất hẳn dưới cái xác to đùng. Sửa theo spec: văng **200–500**
+  (`tien_drop_scatter_min/max`), chia viên **10 → 2 → 1**, kèm event `tien_burst`. Phần rơi
+  ra đất giờ **luôn** xảy ra kể cả người chém là phàm hay bot.
+- **Bỏ `cmd/sim --duel` (30/10/2026, Q25)**. Chủ dự án chốt: kỹ năng có loại tăng sức mạnh,
+  có loại khắc chế, nên **tỉ lệ thắng tay đôi không phản ánh giá trị** — cân bằng theo phản
+  hồi người chơi và số liệu trận thật. Đã xoá hẳn công cụ thay vì giữ một thứ "có nhưng
+  không được dùng".
+- **Q20 đã chốt: giữ luật va kiếm đúng.** Mốc mới để so về sau: **84 lượt chết / 5 phút /
+  40 bot**. Con số 608 lượt/10 phút ghi ở các mục cũ bên dưới là **đo trên luật va kiếm sai**
+  (lỗi dấu `SegSegDist2`), không dùng để so nữa.
+
 - **Minimap bấm mới mở, kill feed còn 1 tin (30/10/2026)**. Chủ dự án: *"khung chat điện
   thoại nhiều quá… mini map đang che mất phần trung tâm, làm nhỏ lại, hoặc cho phép bấm mới
   mở ra"*.

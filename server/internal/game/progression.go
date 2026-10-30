@@ -82,17 +82,18 @@ func (p *Progression) MaxSwords(r int) int {
 
 // DropRealmExp is total_exp after falling one whole realm while keeping the tier and the
 // progress through it (spec §5.1): Trúc Cơ 2 at 40% → Luyện Khí 2 at 40%.
+// DropRealmExp: bị chém thì rớt 1 đại cảnh giới và thanh về **MỨC SÀN** của cảnh giới mới
+// (tầng 1, 0%) — spec v5.8 §5.1.
+//
+// Bản cũ giữ nguyên tầng và % tiến độ (Trúc Cơ tầng 2 → Luyện Khí tầng 2). Luật mới nặng
+// hơn hẳn: Trúc Cơ tầng 2 → Luyện Khí **tầng 1, 0%**, Kim Đan tầng 7 → Trúc Cơ tầng 1 0%.
 func (p *Progression) DropRealmExp(exp float64) float64 {
 	L := p.LevelFromExp(exp)
-	to := L - p.cfg.TiersPerRealm
-	if to < 0 {
+	r := p.Realm(L)
+	if r <= 0 {
 		return 0
 	}
-	progress := 0.0
-	if n := p.ExpNeeded(L); n > 0 {
-		progress = math.Min(1, (exp-p.Threshold(L))/n)
-	}
-	return p.Threshold(to) + progress*p.ExpNeeded(to)
+	return p.Threshold((r - 1) * p.cfg.TiersPerRealm)
 }
 
 // Scale returns scale(L) = min + (max-min) * L / (levels-1); Tiên giới keeps growing by
@@ -141,20 +142,56 @@ func (p *Progression) TienLevel(idx int) int {
 	return (len(p.cfg.Realms) + idx) * p.cfg.TiersPerRealm
 }
 
-// TienEntry is the cumulative Tiên khí needed to STAND at Tiên realm idx: 100, 300, 600, 1000, 1500.
-func (p *Progression) TienEntry(idx int) float64 {
-	sum := 0.0
-	for i := 0; i <= idx && i < len(p.cfg.TienKhiPerStep); i++ {
-		sum += p.cfg.TienKhiPerStep[i]
-	}
-	return sum
-}
+// Tiên giới tính theo TỔNG Tiên khí cộng dồn (spec v5.7 §3.4):
+//
+//	1–100 Chân Tiên · 101–300 Kim Tiên · 301–600 Thái Ất · 601–1000 Đại La · 1001–1500 Đạo Tổ
+//
+// Tiên khí là nguồn sự thật, cảnh giới suy ra từ nó. Bản v5.6 cộng dồn từng chặng và giữ
+// cảnh giới trong `Level`, nên có HAI nguồn sự thật phải tự đồng bộ với nhau — bị chém là
+// chỗ chúng lệch.
 
-// TienNextAt is the cumulative Tiên khí that promotes someone standing at Tiên realm idx
-// (idx = -1 means Đại Thừa tầng 10, still mortal). Returns 0 when already at the top.
-func (p *Progression) TienNextAt(idx int) float64 {
-	if idx+1 >= len(p.cfg.TienKhiPerStep) {
+// TienCeil là trần Tiên khí của cảnh giới Tiên idx (100, 300, 600, 1000, 1500).
+func (p *Progression) TienCeil(idx int) float64 {
+	c := p.cfg.TienKhiCeilings
+	if len(c) == 0 {
 		return 0
 	}
-	return p.TienEntry(idx + 1)
+	return c[min(max(idx, 0), len(c)-1)]
 }
+
+// TienEntry là MỐC KHỞI ĐIỂM (đáy) của cảnh giới Tiên idx: 1, 101, 301, 601, 1001.
+func (p *Progression) TienEntry(idx int) float64 {
+	if idx <= 0 {
+		return 1
+	}
+	return p.TienCeil(idx-1) + 1
+}
+
+// TienWidth là độ rộng khoảng Tiên khí của cảnh giới idx (100, 200, 300, 400, 500) — mốc
+// để tính Thiêu Đốt 8%/giây (spec v5.7 §4.1c).
+func (p *Progression) TienWidth(idx int) float64 {
+	if idx <= 0 {
+		return p.TienCeil(0)
+	}
+	return p.TienCeil(idx) - p.TienCeil(idx-1)
+}
+
+// TienRealmForKhi trả cảnh giới Tiên (0-based) ứng với tổng Tiên khí này; -1 nếu chưa đủ
+// một điểm nào, tức chưa vào Tiên giới.
+//
+// **Viên Tiên khí đầu tiên là vào Chân Tiên ngay** (spec nói rõ) — nên mốc là `>= 1`, không
+// phải `> 0` cho vui: 0,5 điểm vẫn chưa phải Chân Tiên.
+func (p *Progression) TienRealmForKhi(khi float64) int {
+	if khi < 1 {
+		return -1
+	}
+	for i := range p.cfg.TienKhiCeilings {
+		if khi <= p.cfg.TienKhiCeilings[i] {
+			return i
+		}
+	}
+	return len(p.cfg.TienKhiCeilings) - 1
+}
+
+// TienMaxKhi là trần cao nhất (1 500) — Đạo Tổ nạp tới đây thì dư mới đổi Uy Danh.
+func (p *Progression) TienMaxKhi() float64 { return p.TienCeil(p.TienCount() - 1) }
