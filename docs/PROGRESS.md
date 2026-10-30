@@ -719,3 +719,44 @@ bảng không, và thứ tự C→B hay B→C).
    cấm placeholder ở build thật, `check:assets`.
 2. Hướng B hoạt ảnh (mục 6–8) — **chỉ sau khi anh duyệt bảng điểm**.
 3. Chép dòng S6 tự động đầu tiên vào PERF_LOG §3 khi nó xuất hiện.
+
+## Phiên 30/10 (chiều, tiếp) — item Bí Kíp, hoạt ảnh B + C
+
+### Spec v6.3 anh vừa chốt
+Ngưỡng giật 45 giữ tạm · tách 2 nhóm (lặp đọc TB, một lần đọc "lạc lõng") · thứ tự **B → C → A**.
+Kèm yêu cầu mới: phím `[` / `]` xem lần lượt từng animation — **đã làm**.
+
+### Bí Kíp hiện ra placeholder
+`items/skill_scroll.png` có từ lâu; `itemTexture` đoán đường dẫn `buffs/<loại>.png` nên tra
+trượt. Sai trong im lặng — không có ảnh thì vẽ placeholder, nhìn hệt art chưa xong.
+Thêm `npm run check:items` để lần sau máy báo.
+
+### B — chuẩn hoá frame ✅
+`tools/atlas-pack` → `artgen normalize`. Kết quả: anim lặp **20.5 → 15.7 (−24%)**, một lần
+**4.8 → 2.0 (−57%)**, đỏ 3+2 → **1+0**, không anim nào tệ đi.
+
+Ba chỗ spec nguyên văn không chạy được trên art thật, đều có số:
+1. B.2 áp thẳng ra co giãn 896% / dịch 4 116 px (vì `death` cố ý biến hình) → trần ±15%.
+2. Neo chân là phép của nhân vật hình người; rùa/cua/gà tệ đi gấp đôi → **chấm cả hai bản,
+   giữ bản tốt hơn** (25 anim tự bị bỏ qua).
+3. "Đầu trôi > 4 px" làm tiêu chí sinh lại ra 102/149 → dùng tiêu chí của anh (còn đỏ sau B).
+
+**Lỗ hổng đã vá**: bộ dò cắt-sai chỉ ĐẾM frame nên bỏ lọt `co_ba_ganh idle` (1 frame chứa cả
+bốn nhân vật, 3 frame là mảnh vụn 5–12 px) — chính là animation tệ nhất toàn bộ art.
+Thêm `warnFrameSizes`. Sinh lại xong giờ sạch.
+
+### C — bộ điều khiển hoạt ảnh ✅
+`render/animctl.ts`: crossfade 100 ms, giữ pha run↔chase↔flee, nhịp chân theo tốc độ thật,
+lật có co ngang, nghiêng khi rẽ, nhún/squash/thở. Tốc độ lấy từ vị trí ĐÃ NỘI SUY.
+**Chưa đo bằng số được** (đây là cảm giác) — cần anh chơi thử và nhận xét.
+
+### Genart
+Sinh lại 23 sheet hỏng qua 2 lượt. Miscut **15 → 5** (5 tile còn lại cứ sót nền magenta sau
+2 lần sinh; đã vá tạm bằng màu trung bình nên trong game không thấy vệt hồng).
+Thêm job `item_bundle` — chờ anh chốt (xem QUESTIONS.md).
+
+### Còn mở
+- **A (một thân nhiều mặt)** — cần art mới, làm sau cùng theo thứ tự anh chốt.
+- **Hướng A netcode bước 2b** — View Pool, mờ ra, `DescRequest`, cấm placeholder build thật.
+  Vẫn là nút thắt B3 đang mở, có số đo thúc đẩy.
+- `dep_lao idle` 56.8 còn đỏ — nhiều khả năng là hoạt ảnh đảo mắt cố ý, cần anh nhìn bằng `J`.
