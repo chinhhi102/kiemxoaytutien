@@ -70,8 +70,8 @@ type Game struct {
 	orbCount     int
 	// expiring: id các viên CÓ HẠN (Tiên khí). Giữ riêng để `expireItems` khỏi quét cả
 	// bản đồ vật phẩm mỗi tick — xem ghi chú ở đó.
-	expiring     []uint32
-	bossCount    int
+	expiring  []uint32
+	bossCount int
 }
 
 func New(cfg *config.Config, m *world.Map, seed int64) *Game {

@@ -44,6 +44,9 @@ type Zone struct {
 	// respawns: bot của KHU NÀY đang chờ hồi sinh. Để ở phòng thì năm goroutine cùng ghi
 	// một slice — `-race` bắt được ngay khi phòng đông bot.
 	respawns []pendingRespawn
+	// departed: tên bot vừa rời khu này, chờ `updateBots` gom vào bộ nhớ tên của phòng.
+	// Gom ở đây vì `onBotDeath` chạy trong goroutine của khu (xem ghi chú ở đó).
+	departed []string
 	// namesAt/namesDue: lần cuối gửi lại tên người chơi. Thuộc về KHU, không phải phòng —
 	// năm khu chạy song song nên để ở phòng là hai goroutine cùng ghi một ô nhớ.
 	namesAt  float64

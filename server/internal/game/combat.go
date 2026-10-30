@@ -251,6 +251,7 @@ type blade struct {
 //     nửa lưỡi + bề rộng` thì không thanh nào với tới.
 //  3. So khoảng cách giữa hai TÂM lưỡi trước khi gọi `SegSegDist2`: một phép trừ và hai
 //     phép nhân, rẻ hơn hàng chục lần.
+//
 // outerSlots trả khoảng chỉ số kiếm của **vòng ngoài cùng** [from, to).
 //
 // Spec mục 26: kiếm–kiếm chỉ xét vòng ngoài cùng. Lý do hình học: các vòng đồng tâm, vòng
